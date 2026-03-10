@@ -1,8 +1,24 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useAuthStore } from '../store/useAuthStore';
 import { useHabitStore } from '../store/useHabitStore';
 import HabitCard from '../components/HabitCard';
+import { DayOfWeek } from '../types';
+
+// Map JS getDay() (0=Sun, 1=Mon...) to DayOfWeek enum
+const getDayNumberToEnum = (): DayOfWeek => {
+    const day = new Date().getDay();
+    const map: Record<number, DayOfWeek> = {
+        0: 'sunday',
+        1: 'monday',
+        2: 'tuesday',
+        3: 'wednesday',
+        4: 'thursday',
+        5: 'friday',
+        6: 'saturday',
+    };
+    return map[day];
+};
 
 export default function HomeScreen() {
     const { user } = useAuthStore();
@@ -25,8 +41,11 @@ export default function HomeScreen() {
         await toggleHabitCompletion(habitId, isCompleted, getTodayString());
     };
 
-    // Habits scheduled for today (Simplification: assuming all habits show up every day for MVP, but normally we'd filter by DayOfWeek)
-    const todaysHabits = habitsWithCompletion; // If frequency filtering is needed, implement here based on `new Date().getDay()`
+    // Filter habits scheduled for today
+    const todaysHabits = useMemo(() => {
+        const todayEnum = getDayNumberToEnum();
+        return habitsWithCompletion.filter(habit => habit.frequency?.includes(todayEnum));
+    }, [habitsWithCompletion]);
 
     return (
         <ScrollView 
@@ -61,8 +80,8 @@ export default function HomeScreen() {
                 </View>
             ) : (
                 <View style={styles.emptyState}>
-                    <Text style={styles.emptyStateText}>Aún no tienes hábitos registrados.</Text>
-                    <Text style={styles.emptyStateSubtext}>Ve a la pestaña Hábitos para crear uno.</Text>
+                    <Text style={styles.emptyStateText}>Nada programado para hoy.</Text>
+                    <Text style={styles.emptyStateSubtext}>Tus hábitos para este día aparecerán aquí. ¡Tómate un descanso o crea uno nuevo!</Text>
                 </View>
             )}
         </ScrollView>
@@ -117,6 +136,11 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#eee',
         marginBottom: 32,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 2,
     },
     emptyStateText: {
         fontSize: 16,
@@ -129,5 +153,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#888',
         textAlign: 'center',
+        lineHeight: 20,
     }
 });

@@ -3,10 +3,12 @@ import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, RefreshContr
 import { Ionicons } from '@expo/vector-icons';
 import { useHabitStore } from '../store/useHabitStore';
 import CreateHabitModal from '../components/CreateHabitModal';
+import { Habit } from '../types';
 
 export default function HabitosScreen() {
     const { habits, isLoading, loadHabitsData, deleteHabit } = useHabitStore();
     const [isModalVisible, setIsModalVisible] = useState(false);
+    const [habitToEdit, setHabitToEdit] = useState<Habit | null>(null);
 
     // Load data when mounting / refreshing
     const loadData = useCallback(() => {
@@ -34,20 +36,47 @@ export default function HabitosScreen() {
         );
     };
 
-    const renderItem = ({ item }: { item: any }) => (
+    const handleEdit = (habit: Habit) => {
+        setHabitToEdit(habit);
+        setIsModalVisible(true);
+    };
+
+    const handleCloseModal = () => {
+        setIsModalVisible(false);
+        setHabitToEdit(null); // Reset after modal completely closes
+    };
+
+    const handleCreateNew = () => {
+        setHabitToEdit(null);
+        setIsModalVisible(true);
+    };
+
+    const renderItem = ({ item }: { item: Habit }) => (
         <View style={[styles.habitItem, { borderLeftColor: item.color_hex }]}>
             <View style={styles.habitInfo}>
                 <Text style={styles.habitTitle}>{item.title}</Text>
                 {item.description ? (
-                    <Text style={styles.habitDescription}>{item.description}</Text>
+                    <Text style={styles.habitDescription} numberOfLines={2}>{item.description}</Text>
                 ) : null}
+                <View style={styles.frequencyBadge}>
+                    <Text style={styles.frequencyText}>{item.frequency?.length || 7} días/semana</Text>
+                </View>
             </View>
-            <TouchableOpacity 
-                style={styles.deleteButton}
-                onPress={() => confirmDelete(item.id)}
-            >
-                <Ionicons name="trash-outline" size={20} color="#e74c3c" />
-            </TouchableOpacity>
+            
+            <View style={styles.actionsContainer}>
+                <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={() => handleEdit(item)}
+                >
+                    <Ionicons name="pencil-outline" size={20} color="#3498db" />
+                </TouchableOpacity>
+                <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={() => confirmDelete(item.id)}
+                >
+                    <Ionicons name="trash-outline" size={20} color="#e74c3c" />
+                </TouchableOpacity>
+            </View>
         </View>
     );
 
@@ -78,14 +107,15 @@ export default function HabitosScreen() {
 
             <TouchableOpacity 
                 style={styles.fab}
-                onPress={() => setIsModalVisible(true)}
+                onPress={handleCreateNew}
             >
                 <Ionicons name="add" size={28} color="#fff" />
             </TouchableOpacity>
 
             <CreateHabitModal 
                 visible={isModalVisible}
-                onClose={() => setIsModalVisible(false)}
+                onClose={handleCloseModal}
+                initialHabit={habitToEdit}
             />
         </View>
     );
@@ -140,9 +170,26 @@ const styles = StyleSheet.create({
     habitDescription: {
         fontSize: 14,
         color: '#888',
+        marginBottom: 8,
     },
-    deleteButton: {
+    frequencyBadge: {
+        backgroundColor: '#f0f4f8',
+        alignSelf: 'flex-start',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    frequencyText: {
+        fontSize: 12,
+        color: '#666',
+        fontWeight: '500',
+    },
+    actionsContainer: {
+        flexDirection: 'row',
+    },
+    actionButton: {
         padding: 8,
+        marginLeft: 4,
     },
     emptyState: {
         alignItems: 'center',
