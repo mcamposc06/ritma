@@ -24,6 +24,17 @@ export const habitosService = {
     return data || [];
   },
 
+  // Get all historical logs for streak calculation
+  async getAllLogs(): Promise<DailyLog[]> {
+    const { data, error } = await supabase
+      .from('daily_logs')
+      .select('*')
+      .order('log_date', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  },
+
   // Create a new habit
   async createHabit(
     title: string,
@@ -45,6 +56,27 @@ export const habitosService = {
           color_hex,
         },
       ])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  // Update an existing habit
+  async updateHabit(
+    habitId: string,
+    updates: {
+      title?: string;
+      description?: string | null;
+      frequency?: DayOfWeek[];
+      color_hex?: string;
+    }
+  ): Promise<Habit> {
+    const { data, error } = await supabase
+      .from('habits')
+      .update(updates)
+      .eq('id', habitId)
       .select()
       .single();
 

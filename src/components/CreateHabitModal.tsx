@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -10,47 +10,95 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
-  Keyboard
+  Keyboard,
+  ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useHabitStore } from '../store/useHabitStore';
+import { DayOfWeek, Habit } from '../types';
 
 interface CreateHabitModalProps {
   visible: boolean;
   onClose: () => void;
+  initialHabit?: Habit | null; // Pass a habit to edit
 }
 
 const COLORS = ['#3498db', '#e74c3c', '#2ecc71', '#f1c40f', '#9b59b6', '#e67e22'];
 
-export default function CreateHabitModal({ visible, onClose }: CreateHabitModalProps) {
-  const { createHabit } = useHabitStore();
+const DAYS: { key: DayOfWeek; label: string }[] = [
+  { key: 'monday', label: 'L' },
+  { key: 'tuesday', label: 'M' },
+  { key: 'wednesday', label: 'X' },
+  { key: 'thursday', label: 'J' },
+  { key: 'friday', label: 'V' },
+  { key: 'saturday', label: 'S' },
+  { key: 'sunday', label: 'D' },
+];
+
+export default function CreateHabitModal({ visible, onClose, initialHabit }: CreateHabitModalProps) {
+  const { createHabit, updateHabit } = useHabitStore();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [colorHex, setColorHex] = useState(COLORS[0]);
+  const [selectedDays, setSelectedDays] = useState<DayOfWeek[]>(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleCreate = async () => {
-    if (!title.trim()) return;
+  const isEditing = !!initialHabit;
+
+  // Initialize state when modal opens or initialHabit changes
+  useEffect(() => {
+    if (visible && initialHabit) {
+      setTitle(initialHabit.title);
+      setDescription(initialHabit.description || '');
+      setColorHex(initialHabit.color_hex);
+      setSelectedDays(initialHabit.frequency || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
+    } else if (visible && !initialHabit) {
+      resetFields();
+    }
+  }, [visible, initialHabit]);
+
+  const resetFields = () => {
+    setTitle('');
+    setDescription('');
+    setColorHex(COLORS[0]);
+    setSelectedDays(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
+  };
+
+  const handleSave = async () => {
+    if (!title.trim() || selectedDays.length === 0) return;
     
     setIsSubmitting(true);
     try {
-      await createHabit(title.trim(), description.trim() || undefined, undefined, colorHex);
-      setTitle('');
-      setDescription('');
-      setColorHex(COLORS[0]);
+      if (isEditing && initialHabit) {
+        await updateHabit(initialHabit.id, {
+          title: title.trim(),
+          description: description.trim() || null,
+          frequency: selectedDays,
+          color_hex: colorHex
+        });
+      } else {
+        await createHabit(title.trim(), description.trim() || undefined, selectedDays, colorHex);
+      }
+      resetFields();
       onClose();
     } catch (error) {
-      console.error('Error creating habit:', error);
+      console.error('Error saving habit:', error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const resetAndClose = () => {
-    setTitle('');
-    setDescription('');
-    setColorHex(COLORS[0]);
+    resetFields();
     onClose();
+  };
+
+  const toggleDay = (day: DayOfWeek) => {
+    if (selectedDays.includes(day)) {
+      setSelectedDays(selectedDays.filter(d => d !== day));
+    } else {
+      setSelectedDays([...selectedDays, day]);
+    }
   };
 
   return (
@@ -67,21 +115,44 @@ export default function CreateHabitModal({ visible, onClose }: CreateHabitModalP
             style={styles.modalContent}
           >
             <View style={styles.header}>
-              <Text style={styles.headerTitle}>Nuevo Hábito</Text>
+              <Text style={styles.headerTitle}>{isEditing ? 'Editar Hábito' : 'Nuevo Hábito'}</Text>
               <TouchableOpacity onPress={resetAndClose} style={styles.closeButton}>
                 <Ionicons name="close" size={24} color="#333" />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.formSection}>
+            <ScrollView style={styles.formSection} showsVerticalScrollIndicator={false}>
               <Text style={styles.label}>Título del Hábito</Text>
               <TextInput
                 style={styles.input}
                 placeholder="Ej. Beber agua, Leer 20 páginas..."
                 value={title}
                 onChangeText={setTitle}
-                autoFocus={true}
               />
+
+              <Text style={styles.label}>Días de la semana</Text>
+              <View style={styles.daysSelector}>
+                {DAYS.map(day => {
+                  const isSelected = selectedDays.includes(day.key);
+                  return (
+                    <TouchableOpacity
+                      key={day.key}
+                      style={[
+                        styles.dayCircle,
+                        isSelected && { backgroundColor: colorHex, borderColor: colorHex }
+                      ]}
+                      onPress={() => toggleDay(day.key)}
+                    >
+                      <Text style={[
+                        styles.dayText,
+                        isSelected && styles.dayTextSelected
+                      ]}>
+                        {day.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
               <Text style={styles.label}>Descripción (Opcional)</Text>
               <TextInput
@@ -109,17 +180,21 @@ export default function CreateHabitModal({ visible, onClose }: CreateHabitModalP
                   </TouchableOpacity>
                 ))}
               </View>
-            </View>
+            </ScrollView>
 
             <TouchableOpacity 
-              style={[styles.submitButton, (!title.trim() || isSubmitting) && styles.submitButtonDisabled]} 
-              onPress={handleCreate}
-              disabled={!title.trim() || isSubmitting}
+              style={[
+                styles.submitButton, 
+                ({ backgroundColor: colorHex }),
+                (!title.trim() || isSubmitting || selectedDays.length === 0) && styles.submitButtonDisabled
+              ]} 
+              onPress={handleSave}
+              disabled={!title.trim() || isSubmitting || selectedDays.length === 0}
             >
               {isSubmitting ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.submitButtonText}>Crear Hábito</Text>
+                <Text style={styles.submitButtonText}>{isEditing ? 'Guardar Cambios' : 'Crear Hábito'}</Text>
               )}
             </TouchableOpacity>
 
@@ -148,18 +223,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1a1a2e',
   },
   closeButton: {
     padding: 4,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
   },
   formSection: {
-    marginBottom: 24,
+    marginBottom: 20,
+    maxHeight: 400,
   },
   label: {
     fontSize: 14,
@@ -169,27 +247,51 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   input: {
-    backgroundColor: '#f5f7fa',
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: '#e1e4e8',
+    borderColor: '#e2e8f0',
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
     color: '#333',
   },
+  daysSelector: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  dayCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dayText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  dayTextSelected: {
+    color: '#fff',
+  },
   textArea: {
-    height: 100,
+    height: 80,
     textAlignVertical: 'top',
   },
   colorSelector: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 8,
+    marginBottom: 16,
   },
   colorCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -203,14 +305,14 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   submitButton: {
-    backgroundColor: '#3498db',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 14,
+    padding: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 8,
   },
   submitButtonDisabled: {
-    backgroundColor: '#a0cbea',
+    opacity: 0.5,
   },
   submitButtonText: {
     color: '#fff',

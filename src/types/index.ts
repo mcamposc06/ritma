@@ -32,4 +32,5 @@ export interface DailyLog {
 export interface HabitWithCompletion extends Habit {
   completed_today: boolean;
   daily_log_id?: string;
+  current_streak?: number;
 }

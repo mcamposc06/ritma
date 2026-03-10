@@ -23,11 +23,22 @@ export default function HabitCard({ habit, onToggle }: HabitCardProps) {
         <Text style={[styles.title, habit.completed_today && styles.titleCompleted]}>
           {habit.title}
         </Text>
-        {habit.description && (
-          <Text style={[styles.description, habit.completed_today && styles.descriptionCompleted]}>
-            {habit.description}
-          </Text>
-        )}
+        
+        <View style={styles.detailsRow}>
+          {habit.description ? (
+            <Text style={[styles.description, habit.completed_today && styles.descriptionCompleted]} numberOfLines={1}>
+              {habit.description}
+            </Text>
+          ) : <View style={{flex: 1}} />}
+          
+          {habit.current_streak !== undefined && habit.current_streak > 0 && (
+            <View style={styles.streakContainer}>
+              <Text style={styles.streakText}>{habit.current_streak} </Text>
+              <Text style={styles.streakEmoji}>🔥</Text>
+            </View>
+          )}
+        </View>
+
       </View>
       
       <View style={[styles.checkbox, habit.completed_today && { backgroundColor: habit.color_hex, borderColor: habit.color_hex }]}>
@@ -66,18 +77,41 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   titleCompleted: {
     textDecorationLine: 'line-through',
     color: '#888',
   },
+  detailsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   description: {
     fontSize: 14,
     color: '#666',
+    flex: 1,
+    paddingRight: 8,
   },
   descriptionCompleted: {
     color: '#aaa',
+  },
+  streakContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff4e6',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  streakText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#e67e22',
+  },
+  streakEmoji: {
+    fontSize: 10,
   },
   checkbox: {
     width: 28,
