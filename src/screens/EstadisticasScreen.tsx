@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useHabitStore } from '../store/useHabitStore';
 import { DayOfWeek } from '../types';
@@ -8,7 +8,7 @@ import { getLocalDateString } from '../utils/dateHelpers';
 const DAYS_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
 export default function EstadisticasScreen() {
-    const { habits, allLogs, stats, isLoading, loadHabitsData, loadStats } = useHabitStore();
+    const { habits, allLogs, stats, isLoading, loadHabitsData, loadStats, error, clearError } = useHabitStore();
 
     const loadData = useCallback(async () => {
         await loadHabitsData(getLocalDateString());
@@ -18,6 +18,14 @@ export default function EstadisticasScreen() {
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    // notify errors
+    useEffect(() => {
+        if (error) {
+            Alert.alert('Error', error);
+            clearError();
+        }
+    }, [error, clearError]);
 
     // Build weekly heatmap data: last 7 days × each habit
     const heatmapData = useMemo(() => {

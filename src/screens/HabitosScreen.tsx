@@ -5,11 +5,21 @@ import { useHabitStore } from '../store/useHabitStore';
 import CreateHabitModal from '../components/CreateHabitModal';
 import { Habit } from '../types';
 import { getLocalDateString } from '../utils/dateHelpers';
+import { useNavigation } from '@react-navigation/native';
 
 export default function HabitosScreen() {
-    const { habits, isLoading, loadHabitsData, deleteHabit } = useHabitStore();
+    const { habits, isLoading, loadHabitsData, deleteHabit, error, clearError } = useHabitStore();
+    const navigation = useNavigation<any>();
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [habitToEdit, setHabitToEdit] = useState<Habit | null>(null);
+
+    // show errors as alerts
+    useEffect(() => {
+        if (error) {
+            Alert.alert('Error', error);
+            clearError();
+        }
+    }, [error, clearError]);
 
     // Load data when mounting / refreshing
     const loadData = useCallback(() => {
@@ -63,6 +73,12 @@ export default function HabitosScreen() {
             </View>
             
             <View style={styles.actionsContainer}>
+                <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={() => navigation.navigate('HabitHistory', { habitId: item.id, title: item.title })}
+                >
+                    <Ionicons name="calendar-outline" size={20} color="#9b59b6" />
+                </TouchableOpacity>
                 <TouchableOpacity 
                     style={styles.actionButton}
                     onPress={() => handleEdit(item)}

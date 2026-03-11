@@ -19,6 +19,8 @@ interface HabitState {
   updateHabit: (habitId: string, updates: Partial<Habit>) => Promise<void>;
   toggleHabitCompletion: (habitId: string, isCompleted: boolean, dateString: string) => Promise<void>;
   deleteHabit: (habitId: string) => Promise<void>;
+  deleteLog: (dailyLogId: string) => Promise<void>;
+  reset: () => void;
   clearError: () => void;
 }
 
@@ -146,6 +148,9 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         habitsWithCompletion,
         isLoading: false
       });
+
+      // keep statistics up to date after loading fresh data
+      await get().loadStats();
     } catch (error: any) {
       set({ error: error.message || 'Failed to load habits data', isLoading: false });
     }
@@ -167,6 +172,9 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         habitsWithCompletion: updatedHabitsWithCompletion,
         isLoading: false
       });
+
+      // after mutating data refresh stats
+      await get().loadStats();
     } catch (error: any) {
       set({ error: error.message || 'Failed to create habit', isLoading: false });
       throw error;
@@ -189,6 +197,8 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         habitsWithCompletion: updatedHabitsWithCompletion,
         isLoading: false
       });
+
+      await get().loadStats();
     } catch (error: any) {
       set({ error: error.message || 'Failed to update habit', isLoading: false });
       throw error;
@@ -223,6 +233,8 @@ export const useHabitStore = create<HabitState>((set, get) => ({
           habitsWithCompletion: calculateHabitsWithCompletion(get().habits, newTodayLogs, newAllLogs, dateString)
         });
       }
+      // refresh stats after completion toggle
+      await get().loadStats();
     } catch (error: any) {
       set({ error: error.message || 'Failed to toggle habit status' });
     }
@@ -245,10 +257,43 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         habitsWithCompletion: calculateHabitsWithCompletion(newHabits, newTodayLogs, newAllLogs, todayDateString),
         isLoading: false
       });
+
+      await get().loadStats();
     } catch (error: any) {
       set({ error: error.message || 'Failed to delete habit', isLoading: false });
     }
   },
 
-  clearError: () => set({ error: null })
+  clearError: () => set({ error: null }),
+
+  // reset everything (useful on sign out)
+  reset: () => set({
+      habits: [],
+      todayLogs: [],
+      allLogs: [],
+      habitsWithCompletion: [],
+      stats: { totalHabits: 0, totalCompletions: 0, bestStreak: 0, weeklyRate: 0 },
+      isLoading: false,
+      error: null
+  }),
+
+  // remove a specific daily log and update derived data
+  deleteLog: async (dailyLogId: string) => {
+    try {
+      await habitosService.unmarkHabit(dailyLogId);
+      const newTodayLogs = get().todayLogs.filter(l => l.id !== dailyLogId);
+      const newAllLogs = get().allLogs.filter(l => l.id !== dailyLogId);
+      const todayDateString = getLocalDateString();
+
+      set({
+        todayLogs: newTodayLogs,
+        allLogs: newAllLogs,
+        habitsWithCompletion: calculateHabitsWithCompletion(get().habits, newTodayLogs, newAllLogs, todayDateString)
+      });
+
+      await get().loadStats();
+    } catch (error: any) {
+      set({ error: error.message || 'Failed to remove log' });
+    }
+  }
 }));

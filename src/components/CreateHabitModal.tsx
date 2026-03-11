@@ -76,13 +76,16 @@ export default function CreateHabitModal({ visible, onClose, initialHabit }: Cre
           frequency: selectedDays,
           color_hex: colorHex
         });
+        Alert.alert('Éxito', 'Hábito actualizado correctamente.');
       } else {
         await createHabit(title.trim(), description.trim() || undefined, selectedDays, colorHex);
+        Alert.alert('Éxito', 'Hábito creado correctamente.');
       }
       resetFields();
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving habit:', error);
+      Alert.alert('Error', error.message || 'No se pudo guardar el hábito.');
     } finally {
       setIsSubmitting(false);
     }

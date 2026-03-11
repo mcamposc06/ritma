@@ -1,15 +1,20 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { MainStackParamList } from './types';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { TabParamList, MainStackParamList } from './types';
 import HomeScreen from '../screens/HomeScreen';
 import HabitosScreen from '../screens/HabitosScreen';
 import EstadisticasScreen from '../screens/EstadisticasScreen';
 import PerfilScreen from '../screens/PerfilScreen';
+import HabitHistoryScreen from '../screens/HabitHistoryScreen';
 import { Ionicons } from '@expo/vector-icons';
 
-const Tab = createBottomTabNavigator<MainStackParamList>();
+// bottom tabs only know about TabParamList
+const Tab = createBottomTabNavigator<TabParamList>();
+// root stack wraps tabs and additional screens
+const Stack = createNativeStackNavigator<MainStackParamList>();
 
-export default function MainNavigator() {
+function TabNavigator() {
     return (
         <Tab.Navigator
             screenOptions={({ route }) => ({
@@ -49,5 +54,18 @@ export default function MainNavigator() {
             <Tab.Screen name="Estadisticas" component={EstadisticasScreen} options={{ tabBarLabel: 'Estadísticas' }} />
             <Tab.Screen name="Perfil" component={PerfilScreen} options={{ tabBarLabel: 'Perfil' }} />
         </Tab.Navigator>
+    );
+}
+
+export default function MainNavigator() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Tabs" component={TabNavigator} />
+            <Stack.Screen
+                name="HabitHistory"
+                component={HabitHistoryScreen}
+                options={{ headerShown: true, title: 'Historial de Hábito' }}
+            />
+        </Stack.Navigator>
     );
 }

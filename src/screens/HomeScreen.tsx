@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Animated, Alert } from 'react-native';
 import { useAuthStore } from '../store/useAuthStore';
 import { useHabitStore } from '../store/useHabitStore';
 import HabitCard from '../components/HabitCard';
@@ -23,7 +23,7 @@ const getDayNumberToEnum = (): DayOfWeek => {
 
 export default function HomeScreen() {
     const { user } = useAuthStore();
-    const { habitsWithCompletion, isLoading, loadHabitsData, toggleHabitCompletion } = useHabitStore();
+    const { habitsWithCompletion, isLoading, loadHabitsData, toggleHabitCompletion, error, clearError } = useHabitStore();
     const progressAnim = useRef(new Animated.Value(0)).current;
 
     const loadData = useCallback(() => {
@@ -33,6 +33,14 @@ export default function HomeScreen() {
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    // show errors
+    useEffect(() => {
+        if (error) {
+            Alert.alert('Error', error);
+            clearError();
+        }
+    }, [error, clearError]);
 
     const handleToggleHabit = async (habitId: string, isCompleted: boolean) => {
         await toggleHabitCompletion(habitId, isCompleted, getLocalDateString());
