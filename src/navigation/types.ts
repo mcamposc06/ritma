@@ -8,6 +8,7 @@ export type AuthStackParamList = {
 export type MainStackParamList = {
     Home: undefined;
     Habitos: undefined;
+    Estadisticas: undefined;
     Perfil: undefined;
 };
 

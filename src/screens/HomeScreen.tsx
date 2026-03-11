@@ -1,9 +1,10 @@
-import React, { useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
+import React, { useEffect, useCallback, useMemo, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Animated } from 'react-native';
 import { useAuthStore } from '../store/useAuthStore';
 import { useHabitStore } from '../store/useHabitStore';
 import HabitCard from '../components/HabitCard';
 import { DayOfWeek } from '../types';
+import { getLocalDateString, getGreeting } from '../utils/dateHelpers';
 
 // Map JS getDay() (0=Sun, 1=Mon...) to DayOfWeek enum
 const getDayNumberToEnum = (): DayOfWeek => {
@@ -23,14 +24,10 @@ const getDayNumberToEnum = (): DayOfWeek => {
 export default function HomeScreen() {
     const { user } = useAuthStore();
     const { habitsWithCompletion, isLoading, loadHabitsData, toggleHabitCompletion } = useHabitStore();
-
-    // Helper to get today's date in YYYY-MM-DD format
-    const getTodayString = () => {
-        return new Date().toISOString().split('T')[0];
-    };
+    const progressAnim = useRef(new Animated.Value(0)).current;
 
     const loadData = useCallback(() => {
-        loadHabitsData(getTodayString());
+        loadHabitsData(getLocalDateString());
     }, [loadHabitsData]);
 
     useEffect(() => {
@@ -38,7 +35,7 @@ export default function HomeScreen() {
     }, [loadData]);
 
     const handleToggleHabit = async (habitId: string, isCompleted: boolean) => {
-        await toggleHabitCompletion(habitId, isCompleted, getTodayString());
+        await toggleHabitCompletion(habitId, isCompleted, getLocalDateString());
     };
 
     // Filter habits scheduled for today
@@ -46,6 +43,28 @@ export default function HomeScreen() {
         const todayEnum = getDayNumberToEnum();
         return habitsWithCompletion.filter(habit => habit.frequency?.includes(todayEnum));
     }, [habitsWithCompletion]);
+
+    // Calculate progress
+    const completedCount = useMemo(() => todaysHabits.filter(h => h.completed_today).length, [todaysHabits]);
+    const totalCount = todaysHabits.length;
+    const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+    // Animate progress bar
+    useEffect(() => {
+        Animated.spring(progressAnim, {
+            toValue: totalCount > 0 ? completedCount / totalCount : 0,
+            useNativeDriver: false,
+            friction: 8,
+            tension: 40,
+        }).start();
+    }, [completedCount, totalCount, progressAnim]);
+
+    const progressWidth = progressAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0%', '100%'],
+    });
+
+    const greeting = getGreeting();
 
     return (
         <ScrollView 
@@ -57,10 +76,33 @@ export default function HomeScreen() {
         >
             <View style={styles.header}>
                 <View>
-                    <Text style={styles.greeting}>Hola,</Text>
+                    <Text style={styles.greeting}>{greeting},</Text>
                     <Text style={styles.emailText}>{user?.email?.split('@')[0] || 'Usuario'}</Text>
                 </View>
             </View>
+
+            {/* Progress Summary Card */}
+            {totalCount > 0 && (
+                <View style={styles.progressCard}>
+                    <View style={styles.progressHeader}>
+                        <Text style={styles.progressTitle}>Progreso de Hoy</Text>
+                        <Text style={styles.progressPercent}>{progressPercent}%</Text>
+                    </View>
+                    <View style={styles.progressBarBg}>
+                        <Animated.View
+                            style={[
+                                styles.progressBarFill,
+                                { width: progressWidth },
+                                progressPercent === 100 && styles.progressBarComplete,
+                            ]}
+                        />
+                    </View>
+                    <Text style={styles.progressSubtext}>
+                        {completedCount} de {totalCount} hábitos completados
+                        {progressPercent === 100 ? ' 🎉' : ''}
+                    </Text>
+                </View>
+            )}
 
             <Text style={styles.sectionTitle}>Tus Hábitos de Hoy</Text>
 
@@ -101,7 +143,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 32,
+        marginBottom: 24,
     },
     greeting: {
         fontSize: 28,
@@ -112,6 +154,52 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#666',
         marginTop: 4,
+    },
+    progressCard: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
+        elevation: 3,
+    },
+    progressHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    progressTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+    },
+    progressPercent: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#3498db',
+    },
+    progressBarBg: {
+        height: 10,
+        backgroundColor: '#e8f0fe',
+        borderRadius: 5,
+        overflow: 'hidden',
+        marginBottom: 10,
+    },
+    progressBarFill: {
+        height: '100%',
+        backgroundColor: '#3498db',
+        borderRadius: 5,
+    },
+    progressBarComplete: {
+        backgroundColor: '#2ecc71',
+    },
+    progressSubtext: {
+        fontSize: 13,
+        color: '#888',
     },
     sectionTitle: {
         fontSize: 20,

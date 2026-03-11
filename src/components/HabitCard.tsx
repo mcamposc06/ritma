@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { HabitWithCompletion } from '../types';
@@ -9,42 +9,77 @@ interface HabitCardProps {
 }
 
 export default function HabitCard({ habit, onToggle }: HabitCardProps) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const checkAnim = useRef(new Animated.Value(habit.completed_today ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(checkAnim, {
+      toValue: habit.completed_today ? 1 : 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [habit.completed_today, checkAnim]);
+
   const handlePress = () => {
+    // Bounce animation
+    Animated.sequence([
+      Animated.spring(scaleAnim, {
+        toValue: 0.95,
+        useNativeDriver: true,
+        friction: 5,
+        tension: 200,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        friction: 3,
+        tension: 100,
+      }),
+    ]).start();
+
     onToggle(habit.id, habit.completed_today);
   };
 
   return (
-    <TouchableOpacity 
-      style={[styles.card, habit.completed_today && styles.cardCompleted, { borderLeftColor: habit.color_hex }]}
-      activeOpacity={0.7}
-      onPress={handlePress}
-    >
-      <View style={styles.contentContainer}>
-        <Text style={[styles.title, habit.completed_today && styles.titleCompleted]}>
-          {habit.title}
-        </Text>
-        
-        <View style={styles.detailsRow}>
-          {habit.description ? (
-            <Text style={[styles.description, habit.completed_today && styles.descriptionCompleted]} numberOfLines={1}>
-              {habit.description}
-            </Text>
-          ) : <View style={{flex: 1}} />}
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      <TouchableOpacity 
+        style={[styles.card, habit.completed_today && styles.cardCompleted, { borderLeftColor: habit.color_hex }]}
+        activeOpacity={0.7}
+        onPress={handlePress}
+      >
+        <View style={styles.contentContainer}>
+          <Text style={[styles.title, habit.completed_today && styles.titleCompleted]}>
+            {habit.title}
+          </Text>
           
-          {habit.current_streak !== undefined && habit.current_streak > 0 && (
-            <View style={styles.streakContainer}>
-              <Text style={styles.streakText}>{habit.current_streak} </Text>
-              <Text style={styles.streakEmoji}>🔥</Text>
-            </View>
-          )}
-        </View>
+          <View style={styles.detailsRow}>
+            {habit.description ? (
+              <Text style={[styles.description, habit.completed_today && styles.descriptionCompleted]} numberOfLines={1}>
+                {habit.description}
+              </Text>
+            ) : <View style={{flex: 1}} />}
+            
+            {habit.current_streak !== undefined && habit.current_streak > 0 && (
+              <View style={styles.streakContainer}>
+                <Text style={styles.streakText}>{habit.current_streak} </Text>
+                <Text style={styles.streakEmoji}>🔥</Text>
+              </View>
+            )}
+          </View>
 
-      </View>
-      
-      <View style={[styles.checkbox, habit.completed_today && { backgroundColor: habit.color_hex, borderColor: habit.color_hex }]}>
-        {habit.completed_today && <Ionicons name="checkmark" size={16} color="#fff" />}
-      </View>
-    </TouchableOpacity>
+        </View>
+        
+        <Animated.View 
+          style={[
+            styles.checkbox, 
+            habit.completed_today && { backgroundColor: habit.color_hex, borderColor: habit.color_hex },
+            { transform: [{ scale: checkAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.3, 1] }) }] }
+          ]}
+        >
+          {habit.completed_today && <Ionicons name="checkmark" size={16} color="#fff" />}
+        </Animated.View>
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 

@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MainStackParamList } from './types';
 import HomeScreen from '../screens/HomeScreen';
 import HabitosScreen from '../screens/HabitosScreen';
+import EstadisticasScreen from '../screens/EstadisticasScreen';
 import PerfilScreen from '../screens/PerfilScreen';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -31,10 +32,12 @@ export default function MainNavigator() {
                         iconName = focused ? 'home' : 'home-outline';
                     } else if (route.name === 'Habitos') {
                         iconName = focused ? 'list' : 'list-outline';
+                    } else if (route.name === 'Estadisticas') {
+                        iconName = focused ? 'stats-chart' : 'stats-chart-outline';
                     } else if (route.name === 'Perfil') {
                         iconName = focused ? 'person' : 'person-outline';
                     } else {
-                        iconName = 'help'; // default fallback
+                        iconName = 'help';
                     }
 
                     return <Ionicons name={iconName} size={size} color={color} />;
@@ -43,6 +46,7 @@ export default function MainNavigator() {
         >
             <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: 'Inicio' }} />
             <Tab.Screen name="Habitos" component={HabitosScreen} options={{ tabBarLabel: 'Hábitos' }} />
+            <Tab.Screen name="Estadisticas" component={EstadisticasScreen} options={{ tabBarLabel: 'Estadísticas' }} />
             <Tab.Screen name="Perfil" component={PerfilScreen} options={{ tabBarLabel: 'Perfil' }} />
         </Tab.Navigator>
     );

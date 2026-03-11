@@ -82,7 +82,38 @@ export default function LoginScreen() {
                         </View>
                     </View>
 
-                    <TouchableOpacity style={styles.forgotPassword}>
+                    <TouchableOpacity style={styles.forgotPassword} onPress={() => {
+                        Alert.prompt
+                            ? Alert.prompt(
+                                'Recuperar Contraseña',
+                                'Ingresa tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña.',
+                                async (inputEmail: string) => {
+                                    if (!inputEmail) return;
+                                    const { error } = await supabase.auth.resetPasswordForEmail(inputEmail);
+                                    if (error) {
+                                        Alert.alert('Error', error.message);
+                                    } else {
+                                        Alert.alert('¡Listo!', 'Revisa tu correo electrónico para restablecer tu contraseña.');
+                                    }
+                                },
+                                'plain-text',
+                                email
+                            )
+                            : (() => {
+                                const resetEmail = email || '';
+                                if (!resetEmail) {
+                                    Alert.alert('Recuperar Contraseña', 'Por favor, escribe tu correo electrónico en el campo de arriba y luego presiona este botón de nuevo.');
+                                    return;
+                                }
+                                supabase.auth.resetPasswordForEmail(resetEmail).then(({ error }) => {
+                                    if (error) {
+                                        Alert.alert('Error', error.message);
+                                    } else {
+                                        Alert.alert('¡Listo!', `Revisa tu correo (${resetEmail}) para restablecer tu contraseña.`);
+                                    }
+                                });
+                            })();
+                    }}>
                         <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
                     </TouchableOpacity>
 

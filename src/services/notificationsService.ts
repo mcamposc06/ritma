@@ -1,10 +1,13 @@
 import * as Notifications from 'expo-notifications';
+import { SchedulableTriggerInputTypes } from 'expo-notifications';
 import { Platform } from 'react-native';
 
 // Behavior when a notification is received while the app is foregrounded
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
@@ -37,9 +40,9 @@ export const notificationsService = {
         sound: true,
       },
       trigger: {
+        type: SchedulableTriggerInputTypes.DAILY,
         hour: hour,
         minute: minute,
-        repeats: true,
       },
     });
   },

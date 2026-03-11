@@ -1,13 +1,14 @@
 import { create } from 'zustand';
 import { Habit, DailyLog, HabitWithCompletion, DayOfWeek } from '../types';
 import { habitosService } from '../services/habitosService';
+import { getLocalDateString } from '../utils/dateHelpers';
 
 interface HabitState {
   habits: Habit[];
   todayLogs: DailyLog[];
   allLogs: DailyLog[];
   habitsWithCompletion: HabitWithCompletion[];
-  stats: { totalHabits: number, totalCompletions: number };
+  stats: { totalHabits: number; totalCompletions: number; bestStreak: number; weeklyRate: number };
   isLoading: boolean;
   error: string | null;
   
@@ -32,8 +33,6 @@ const calculateStreak = (habit: Habit, habitLogs: DailyLog[], todayDateString: s
   // Check if there is a log for today
   const hasTodayLog = habitLogs.some(l => l.log_date === todayDateString);
   if (!hasTodayLog) {
-     // If no log today, streak check starts from yesterday.
-     // (If today is not in frequency, it's fine, we still start looking backwards from yesterday)
      currentDate.setDate(currentDate.getDate() - 1);
   }
 
@@ -41,7 +40,7 @@ const calculateStreak = (habit: Habit, habitLogs: DailyLog[], todayDateString: s
   const maxLookback = 365;
 
   for (let i = 0; i < maxLookback; i++) {
-     const dateStr = currentDate.toISOString().split('T')[0];
+     const dateStr = getLocalDateString(currentDate);
      const dayOfWeek = daysMap[currentDate.getDay()];
      
      if (habit.frequency.includes(dayOfWeek)) {
@@ -49,7 +48,7 @@ const calculateStreak = (habit: Habit, habitLogs: DailyLog[], todayDateString: s
        if (hasLog) {
          streak++;
        } else {
-         break; // Missing a required day breaks the streak
+         break;
        }
      }
      
@@ -73,19 +72,57 @@ const calculateHabitsWithCompletion = (habits: Habit[], todayLogs: DailyLog[], a
   });
 };
 
+// Calculate advanced stats from local data
+const calculateAdvancedStats = (habits: Habit[], allLogs: DailyLog[], todayDateString: string) => {
+  const daysMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as DayOfWeek[];
+  
+  // Best streak across all habits
+  let bestStreak = 0;
+  for (const habit of habits) {
+    const habitLogs = allLogs.filter(l => l.habit_id === habit.id);
+    const streak = calculateStreak(habit, habitLogs, todayDateString);
+    if (streak > bestStreak) bestStreak = streak;
+  }
+  
+  // Weekly completion rate (last 7 days)
+  let expectedCount = 0;
+  let completedCount = 0;
+  
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(`${todayDateString}T12:00:00`);
+    d.setDate(d.getDate() - i);
+    const dateStr = getLocalDateString(d);
+    const dayOfWeek = daysMap[d.getDay()];
+    
+    for (const habit of habits) {
+      if (habit.frequency?.includes(dayOfWeek)) {
+        expectedCount++;
+        const hasLog = allLogs.some(l => l.habit_id === habit.id && l.log_date === dateStr);
+        if (hasLog) completedCount++;
+      }
+    }
+  }
+  
+  const weeklyRate = expectedCount > 0 ? Math.round((completedCount / expectedCount) * 100) : 0;
+  
+  return { bestStreak, weeklyRate };
+};
+
 export const useHabitStore = create<HabitState>((set, get) => ({
   habits: [],
   todayLogs: [],
   allLogs: [],
   habitsWithCompletion: [],
-  stats: { totalHabits: 0, totalCompletions: 0 },
+  stats: { totalHabits: 0, totalCompletions: 0, bestStreak: 0, weeklyRate: 0 },
   isLoading: false,
   error: null,
 
   loadStats: async () => {
     try {
-      const stats = await habitosService.getStats();
-      set({ stats });
+      const baseStats = await habitosService.getStats();
+      const todayDateString = getLocalDateString();
+      const { bestStreak, weeklyRate } = calculateAdvancedStats(get().habits, get().allLogs, todayDateString);
+      set({ stats: { ...baseStats, bestStreak, weeklyRate } });
     } catch (error: any) {
       console.error("Failed to load stats", error);
     }
@@ -119,7 +156,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     try {
       const newHabit = await habitosService.createHabit(title, description, frequency, color_hex);
       const updatedHabits = [newHabit, ...get().habits];
-      const todayDateString = new Date().toISOString().split('T')[0];
+      const todayDateString = getLocalDateString();
       
       const updatedHabitsWithCompletion = calculateHabitsWithCompletion(
         updatedHabits, get().todayLogs, get().allLogs, todayDateString
@@ -141,7 +178,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     try {
       const updatedHabit = await habitosService.updateHabit(habitId, updates);
       const updatedHabits = get().habits.map(h => h.id === habitId ? updatedHabit : h);
-      const todayDateString = new Date().toISOString().split('T')[0];
+      const todayDateString = getLocalDateString();
       
       const updatedHabitsWithCompletion = calculateHabitsWithCompletion(
         updatedHabits, get().todayLogs, get().allLogs, todayDateString
@@ -199,7 +236,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       const newHabits = get().habits.filter(h => h.id !== habitId);
       const newTodayLogs = get().todayLogs.filter(l => l.habit_id !== habitId);
       const newAllLogs = get().allLogs.filter(l => l.habit_id !== habitId);
-      const todayDateString = new Date().toISOString().split('T')[0];
+      const todayDateString = getLocalDateString();
       
       set({
         habits: newHabits,

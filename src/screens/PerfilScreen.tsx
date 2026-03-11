@@ -5,28 +5,30 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../store/useAuthStore';
 import { useHabitStore } from '../store/useHabitStore';
 import { notificationsService } from '../services/notificationsService';
+import { getLocalDateString } from '../utils/dateHelpers';
 
 export default function PerfilScreen() {
     const { user, signOut } = useAuthStore();
-    const { stats, loadStats } = useHabitStore();
+    const { stats, loadStats, loadHabitsData } = useHabitStore();
     const [refreshing, setRefreshing] = useState(false);
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
+        await loadHabitsData(getLocalDateString());
         await loadStats();
         setRefreshing(false);
-    }, [loadStats]);
+    }, [loadStats, loadHabitsData]);
 
     useEffect(() => {
-        loadStats();
+        loadHabitsData(getLocalDateString()).then(() => loadStats());
         // Load notification preference
         AsyncStorage.getItem('notificationsEnabled').then(val => {
             if (val === 'true') {
                 setNotificationsEnabled(true);
             }
         });
-    }, [loadStats]);
+    }, [loadStats, loadHabitsData]);
 
     const toggleNotifications = async (value: boolean) => {
         if (value) {
@@ -64,14 +66,24 @@ export default function PerfilScreen() {
 
             <View style={styles.statsContainer}>
                 <View style={styles.statBox}>
-                    <Ionicons name="documents-outline" size={28} color="#3498db" />
+                    <Ionicons name="documents-outline" size={24} color="#3498db" />
                     <Text style={styles.statValue}>{stats.totalHabits}</Text>
-                    <Text style={styles.statLabel}>Hábitos Activos</Text>
+                    <Text style={styles.statLabel}>Activos</Text>
                 </View>
                 <View style={styles.statBox}>
-                    <Ionicons name="checkmark-circle-outline" size={28} color="#2ecc71" />
+                    <Ionicons name="checkmark-circle-outline" size={24} color="#2ecc71" />
                     <Text style={styles.statValue}>{stats.totalCompletions}</Text>
                     <Text style={styles.statLabel}>Completados</Text>
+                </View>
+                <View style={styles.statBox}>
+                    <Ionicons name="flame-outline" size={24} color="#e67e22" />
+                    <Text style={styles.statValue}>{stats.bestStreak}</Text>
+                    <Text style={styles.statLabel}>Mejor Racha</Text>
+                </View>
+                <View style={styles.statBox}>
+                    <Ionicons name="trending-up-outline" size={24} color="#9b59b6" />
+                    <Text style={styles.statValue}>{stats.weeklyRate}%</Text>
+                    <Text style={styles.statLabel}>Semanal</Text>
                 </View>
             </View>
 
@@ -147,17 +159,18 @@ const styles = StyleSheet.create({
     },
     statsContainer: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         width: '100%',
         justifyContent: 'space-between',
-        marginBottom: 40,
+        marginBottom: 24,
     },
     statBox: {
-        flex: 1,
+        width: '47%',
         backgroundColor: '#fff',
-        padding: 20,
+        padding: 16,
         borderRadius: 16,
         alignItems: 'center',
-        marginHorizontal: 8,
+        marginBottom: 12,
         elevation: 2,
         shadowColor: '#000',
         shadowOpacity: 0.05,

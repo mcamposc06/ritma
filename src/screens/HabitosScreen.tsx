@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useHabitStore } from '../store/useHabitStore';
 import CreateHabitModal from '../components/CreateHabitModal';
 import { Habit } from '../types';
+import { getLocalDateString } from '../utils/dateHelpers';
 
 export default function HabitosScreen() {
     const { habits, isLoading, loadHabitsData, deleteHabit } = useHabitStore();
@@ -12,9 +13,7 @@ export default function HabitosScreen() {
 
     // Load data when mounting / refreshing
     const loadData = useCallback(() => {
-        // We pass today just to satisfy the store API, though here we primarily care about the 'habits' list
-        const today = new Date().toISOString().split('T')[0];
-        loadHabitsData(today);
+        loadHabitsData(getLocalDateString());
     }, [loadHabitsData]);
 
     useEffect(() => {
