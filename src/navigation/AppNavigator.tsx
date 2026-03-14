@@ -1,9 +1,13 @@
 import React, { useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
+import { View, ActivityIndicator } from 'react-native';
+import * as Linking from 'expo-linking';
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
 import { useAuthStore } from '../store/useAuthStore';
-import { View, ActivityIndicator } from 'react-native';
+import { RootStackParamList } from './types';
+
+const prefix = Linking.createURL('/');
 
 export default function AppNavigator() {
     const { session, isInitialized, initialize } = useAuthStore();
@@ -20,8 +24,37 @@ export default function AppNavigator() {
         );
     }
 
+    const linking: LinkingOptions<RootStackParamList> = {
+        prefixes: [prefix],
+        config: {
+            screens: {
+                Auth: {
+                    screens: {
+                        Login: 'login',
+                        Register: 'register',
+                        PrivacyTerms: 'privacy-terms',
+                    },
+                },
+                Main: {
+                    screens: {
+                        Tabs: {
+                            screens: {
+                                Home: 'home',
+                                Habitos: 'habits',
+                                Estadisticas: 'stats',
+                                Perfil: 'profile',
+                            },
+                        },
+                        HabitDetail: 'habit/:habitId',
+                        HabitHistory: 'habit-history/:habitId',
+                    },
+                },
+            },
+        },
+    };
+
     return (
-        <NavigationContainer>
+        <NavigationContainer linking={linking}>
             {session ? <MainNavigator /> : <AuthNavigator />}
         </NavigationContainer>
     );

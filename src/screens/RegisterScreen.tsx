@@ -147,7 +147,20 @@ export default function RegisterScreen() {
                     </TouchableOpacity>
 
                     <Text style={styles.termsText}>
-                        Al registrarte, aceptas nuestros <Text style={styles.termsLink} onPress={() => navigation.navigate('PrivacyTerms', { type: 'terms' })}>Términos de Servicio</Text> y <Text style={styles.termsLink} onPress={() => navigation.navigate('PrivacyTerms', { type: 'privacy' })}>Política de Privacidad</Text>.
+                        Al registrarte, aceptas nuestros{' '}
+                        <Text 
+                            style={styles.termsLink} 
+                            onPress={() => navigation.navigate('PrivacyTerms', { type: 'terms' })}
+                        >
+                            Términos de Servicio
+                        </Text>
+                        {' '}y{' '}
+                        <Text 
+                            style={styles.termsLink} 
+                            onPress={() => navigation.navigate('PrivacyTerms', { type: 'privacy' })}
+                        >
+                            Política de Privacidad
+                        </Text>.
                     </Text>
                 </View>
 
