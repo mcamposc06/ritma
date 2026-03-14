@@ -5,11 +5,23 @@ import { useHabitStore } from '../store/useHabitStore';
 import CreateHabitModal from '../components/CreateHabitModal';
 import { Habit } from '../types';
 import { getLocalDateString } from '../utils/dateHelpers';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { MainStackParamList, MainTabParamList } from '../navigation/types';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { getShadowStyle } from '../utils/styleHelpers';
+
+type HabitosScreenNavigationProp = CompositeNavigationProp<
+    BottomTabNavigationProp<MainTabParamList, 'Habitos'>,
+    NativeStackNavigationProp<MainStackParamList>
+>;
 
 export default function HabitosScreen() {
     const { habits, isLoading, loadHabitsData, deleteHabit } = useHabitStore();
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [habitToEdit, setHabitToEdit] = useState<Habit | null>(null);
+    const navigation = useNavigation<HabitosScreenNavigationProp>();
 
     // Load data when mounting / refreshing
     const loadData = useCallback(() => {
@@ -29,7 +41,15 @@ export default function HabitosScreen() {
                 { 
                     text: "Eliminar", 
                     style: "destructive",
-                    onPress: () => deleteHabit(habitId) 
+                    onPress: async () => {
+                        try {
+                            await deleteHabit(habitId);
+                            // No need for loadData() here as store handles it, 
+                            // but ensuring we catch errors.
+                        } catch (e) {
+                            Alert.alert("Error", "No se pudo eliminar el hábito.");
+                        }
+                    } 
                 }
             ]
         );
@@ -52,7 +72,11 @@ export default function HabitosScreen() {
 
     const renderItem = ({ item }: { item: Habit }) => (
         <View style={[styles.habitItem, { borderLeftColor: item.color_hex }]}>
-            <View style={styles.habitInfo}>
+            <TouchableOpacity 
+                style={styles.habitInfo}
+                onPress={() => navigation.navigate('HabitDetail', { habitId: item.id })}
+                activeOpacity={0.7}
+            >
                 <Text style={styles.habitTitle}>{item.title}</Text>
                 {item.description ? (
                     <Text style={styles.habitDescription} numberOfLines={2}>{item.description}</Text>
@@ -60,7 +84,7 @@ export default function HabitosScreen() {
                 <View style={styles.frequencyBadge}>
                     <Text style={styles.frequencyText}>{item.frequency?.length || 7} días/semana</Text>
                 </View>
-            </View>
+            </TouchableOpacity>
             
             <View style={styles.actionsContainer}>
                 <TouchableOpacity 

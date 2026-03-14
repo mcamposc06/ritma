@@ -1,15 +1,19 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { MainStackParamList } from './types';
+import { MainStackParamList, MainTabParamList } from './types';
 import HomeScreen from '../screens/HomeScreen';
 import HabitosScreen from '../screens/HabitosScreen';
 import EstadisticasScreen from '../screens/EstadisticasScreen';
 import PerfilScreen from '../screens/PerfilScreen';
+import PrivacyTermsScreen from '../screens/PrivacyTermsScreen';
+import HabitDetailScreen from '../screens/HabitDetailScreen';
 import { Ionicons } from '@expo/vector-icons';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-const Tab = createBottomTabNavigator<MainStackParamList>();
+const Tab = createBottomTabNavigator<MainTabParamList>();
+const Stack = createNativeStackNavigator<MainStackParamList>();
 
-export default function MainNavigator() {
+function TabNavigator() {
     return (
         <Tab.Navigator
             screenOptions={({ route }) => ({
@@ -49,5 +53,15 @@ export default function MainNavigator() {
             <Tab.Screen name="Estadisticas" component={EstadisticasScreen} options={{ tabBarLabel: 'Estadísticas' }} />
             <Tab.Screen name="Perfil" component={PerfilScreen} options={{ tabBarLabel: 'Perfil' }} />
         </Tab.Navigator>
+    );
+}
+
+export default function MainNavigator() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="MainTabs" component={TabNavigator} />
+            <Stack.Screen name="PrivacyTerms" component={PrivacyTermsScreen} />
+            <Stack.Screen name="HabitDetail" component={HabitDetailScreen} />
+        </Stack.Navigator>
     );
 }

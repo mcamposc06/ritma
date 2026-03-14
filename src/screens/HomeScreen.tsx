@@ -1,10 +1,23 @@
-import React, { useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useEffect, useCallback, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Animated } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import ConfettiCannon from 'react-native-confetti-cannon';
+import { getShadowStyle } from '../utils/styleHelpers';
 import { useAuthStore } from '../store/useAuthStore';
 import { useHabitStore } from '../store/useHabitStore';
 import HabitCard from '../components/HabitCard';
-import { DayOfWeek } from '../types';
+import { DayOfWeek, Habit } from '../types';
 import { getLocalDateString, getGreeting } from '../utils/dateHelpers';
+import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { MainStackParamList, MainTabParamList } from '../navigation/types';
+
+type HomeScreenNavigationProp = CompositeNavigationProp<
+    BottomTabNavigationProp<MainTabParamList, 'Home'>,
+    NativeStackNavigationProp<MainStackParamList>
+>;
 
 // Map JS getDay() (0=Sun, 1=Mon...) to DayOfWeek enum
 const getDayNumberToEnum = (): DayOfWeek => {
@@ -24,7 +37,10 @@ const getDayNumberToEnum = (): DayOfWeek => {
 export default function HomeScreen() {
     const { user } = useAuthStore();
     const { habitsWithCompletion, isLoading, loadHabitsData, toggleHabitCompletion } = useHabitStore();
+    const navigation = useNavigation<HomeScreenNavigationProp>();
     const progressAnim = useRef(new Animated.Value(0)).current;
+    const [showConfetti, setShowConfetti] = useState(false);
+    const hasCelebrated = useRef(false);
 
     const loadData = useCallback(() => {
         loadHabitsData(getLocalDateString());
@@ -35,6 +51,13 @@ export default function HomeScreen() {
     }, [loadData]);
 
     const handleToggleHabit = async (habitId: string, isCompleted: boolean) => {
+        // Trigger haptic feedback
+        if (!isCompleted) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } else {
+            Haptics.selectionAsync();
+        }
+        
         await toggleHabitCompletion(habitId, isCompleted, getLocalDateString());
     };
 
@@ -49,7 +72,7 @@ export default function HomeScreen() {
     const totalCount = todaysHabits.length;
     const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-    // Animate progress bar
+    // Animate progress bar and check for celebration
     useEffect(() => {
         Animated.spring(progressAnim, {
             toValue: totalCount > 0 ? completedCount / totalCount : 0,
@@ -57,6 +80,20 @@ export default function HomeScreen() {
             friction: 8,
             tension: 40,
         }).start();
+
+        // Trigger confetti if 100% completed
+        if (totalCount > 0 && completedCount === totalCount && !hasCelebrated.current) {
+            setShowConfetti(true);
+            hasCelebrated.current = true;
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            
+            // Reset confetti state after some time
+            setTimeout(() => {
+                setShowConfetti(false);
+            }, 5000);
+        } else if (completedCount < totalCount) {
+            hasCelebrated.current = false;
+        }
     }, [completedCount, totalCount, progressAnim]);
 
     const progressWidth = progressAnim.interpolate({
@@ -67,8 +104,8 @@ export default function HomeScreen() {
     const greeting = getGreeting();
 
     return (
-        <ScrollView 
-            style={styles.safeArea} 
+        <ScrollView
+            style={styles.safeArea}
             contentContainerStyle={styles.container}
             refreshControl={
                 <RefreshControl refreshing={isLoading} onRefresh={loadData} colors={['#3498db']} />
@@ -77,7 +114,7 @@ export default function HomeScreen() {
             <View style={styles.header}>
                 <View>
                     <Text style={styles.greeting}>{greeting},</Text>
-                    <Text style={styles.emailText}>{user?.email?.split('@')[0] || 'Usuario'}</Text>
+                    <Text style={styles.emailText}>{user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuario'}</Text>
                 </View>
             </View>
 
@@ -113,10 +150,11 @@ export default function HomeScreen() {
             ) : todaysHabits.length > 0 ? (
                 <View style={styles.habitsList}>
                     {todaysHabits.map((habit) => (
-                        <HabitCard 
-                            key={habit.id} 
-                            habit={habit} 
-                            onToggle={handleToggleHabit} 
+                        <HabitCard
+                            key={habit.id}
+                            habit={habit}
+                            onToggle={handleToggleHabit}
+                            onPressDetails={() => navigation.navigate('HabitDetail', { habitId: habit.id })}
                         />
                     ))}
                 </View>
@@ -125,6 +163,15 @@ export default function HomeScreen() {
                     <Text style={styles.emptyStateText}>Nada programado para hoy.</Text>
                     <Text style={styles.emptyStateSubtext}>Tus hábitos para este día aparecerán aquí. ¡Tómate un descanso o crea uno nuevo!</Text>
                 </View>
+            )}
+            
+            {showConfetti && (
+                <ConfettiCannon
+                    count={200}
+                    origin={{ x: -10, y: 0 }}
+                    fadeOut={true}
+                    fallSpeed={3000}
+                />
             )}
         </ScrollView>
     );
@@ -160,11 +207,7 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: 20,
         marginBottom: 24,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.06,
-        shadowRadius: 10,
-        elevation: 3,
+        ...getShadowStyle('#000', 0, 4, 0.06, 10, 3),
     },
     progressHeader: {
         flexDirection: 'row',
@@ -224,11 +267,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#eee',
         marginBottom: 32,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 2,
+        ...getShadowStyle('#000', 0, 4, 0.05, 10, 2),
     },
     emptyStateText: {
         fontSize: 16,

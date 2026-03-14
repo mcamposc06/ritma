@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  Modal, 
-  TextInput, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  Modal,
+  TextInput,
+  TouchableOpacity,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -66,7 +66,7 @@ export default function CreateHabitModal({ visible, onClose, initialHabit }: Cre
 
   const handleSave = async () => {
     if (!title.trim() || selectedDays.length === 0) return;
-    
+
     setIsSubmitting(true);
     try {
       if (isEditing && initialHabit) {
@@ -108,99 +108,109 @@ export default function CreateHabitModal({ visible, onClose, initialHabit }: Cre
       transparent={true}
       onRequestClose={resetAndClose}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.modalContent}
+      <View style={styles.modalOverlay}>
+        {/* Semi-transparent background that closes the modal when clicked */}
+        <TouchableOpacity 
+          style={styles.absoluteFill} 
+          activeOpacity={1} 
+          onPress={resetAndClose}
+        />
+
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalContent}
+        >
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>{isEditing ? 'Editar Hábito' : 'Nuevo Hábito'}</Text>
+            <TouchableOpacity onPress={resetAndClose} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView 
+            style={styles.formSection} 
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
-            <View style={styles.header}>
-              <Text style={styles.headerTitle}>{isEditing ? 'Editar Hábito' : 'Nuevo Hábito'}</Text>
-              <TouchableOpacity onPress={resetAndClose} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
+            <Text style={styles.label}>Título del Hábito</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ej. Beber agua, Leer 20 páginas..."
+              value={title}
+              onChangeText={setTitle}
+              autoFocus={!isEditing}
+            />
+
+            <Text style={styles.label}>Días de la semana</Text>
+            <View style={styles.daysSelector}>
+              {DAYS.map(day => {
+                const isSelected = selectedDays.includes(day.key);
+                return (
+                  <TouchableOpacity
+                    key={day.key}
+                    style={[
+                      styles.dayCircle,
+                      isSelected && { backgroundColor: colorHex, borderColor: colorHex }
+                    ]}
+                    onPress={() => toggleDay(day.key)}
+                  >
+                    <Text style={[
+                      styles.dayText,
+                      isSelected && styles.dayTextSelected
+                    ]}>
+                      {day.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
-            <ScrollView style={styles.formSection} showsVerticalScrollIndicator={false}>
-              <Text style={styles.label}>Título del Hábito</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ej. Beber agua, Leer 20 páginas..."
-                value={title}
-                onChangeText={setTitle}
-              />
+            <Text style={styles.label}>Descripción (Opcional)</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Agrega notas o detalles..."
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={3}
+            />
 
-              <Text style={styles.label}>Días de la semana</Text>
-              <View style={styles.daysSelector}>
-                {DAYS.map(day => {
-                  const isSelected = selectedDays.includes(day.key);
-                  return (
-                    <TouchableOpacity
-                      key={day.key}
-                      style={[
-                        styles.dayCircle,
-                        isSelected && { backgroundColor: colorHex, borderColor: colorHex }
-                      ]}
-                      onPress={() => toggleDay(day.key)}
-                    >
-                      <Text style={[
-                        styles.dayText,
-                        isSelected && styles.dayTextSelected
-                      ]}>
-                        {day.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+            <Text style={styles.label}>Color</Text>
+            <View style={styles.colorSelector}>
+              {COLORS.map(color => (
+                <TouchableOpacity
+                  key={color}
+                  style={[
+                    styles.colorCircle,
+                    { backgroundColor: color },
+                    colorHex === color && styles.colorCircleSelected
+                  ]}
+                  onPress={() => setColorHex(color)}
+                >
+                  {colorHex === color && <Ionicons name="checkmark" size={16} color="#fff" />}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
 
-              <Text style={styles.label}>Descripción (Opcional)</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Agrega notas o detalles..."
-                value={description}
-                onChangeText={setDescription}
-                multiline
-                numberOfLines={3}
-              />
+          <TouchableOpacity
+            style={[
+              styles.submitButton,
+              { backgroundColor: colorHex },
+              (!title.trim() || isSubmitting || selectedDays.length === 0) && styles.submitButtonDisabled
+            ]}
+            onPress={handleSave}
+            disabled={!title.trim() || isSubmitting || selectedDays.length === 0}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.submitButtonText}>{isEditing ? 'Guardar Cambios' : 'Crear Hábito'}</Text>
+            )}
+          </TouchableOpacity>
 
-              <Text style={styles.label}>Color</Text>
-              <View style={styles.colorSelector}>
-                {COLORS.map(color => (
-                  <TouchableOpacity
-                    key={color}
-                    style={[
-                      styles.colorCircle, 
-                      { backgroundColor: color },
-                      colorHex === color && styles.colorCircleSelected
-                    ]}
-                    onPress={() => setColorHex(color)}
-                  >
-                    {colorHex === color && <Ionicons name="checkmark" size={16} color="#fff" />}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
-
-            <TouchableOpacity 
-              style={[
-                styles.submitButton, 
-                ({ backgroundColor: colorHex }),
-                (!title.trim() || isSubmitting || selectedDays.length === 0) && styles.submitButtonDisabled
-              ]} 
-              onPress={handleSave}
-              disabled={!title.trim() || isSubmitting || selectedDays.length === 0}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.submitButtonText}>{isEditing ? 'Guardar Cambios' : 'Crear Hábito'}</Text>
-              )}
-            </TouchableOpacity>
-
-          </KeyboardAvoidingView>
-        </View>
-      </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -210,6 +220,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
+  },
+  absoluteFill: {
+    ...StyleSheet.absoluteFillObject,
   },
   modalContent: {
     backgroundColor: '#fff',

@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useHabitStore } from '../store/useHabitStore';
 import { DayOfWeek } from '../types';
 import { getLocalDateString } from '../utils/dateHelpers';
+import { getShadowStyle } from '../utils/styleHelpers';
 
 const DAYS_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
@@ -146,7 +147,7 @@ export default function EstadisticasScreen() {
                             <Text style={styles.legendText}>Pendiente</Text>
                         </View>
                         <View style={styles.legendItem}>
-                            <View style={[styles.legendDot, { backgroundColor: '#3498db' }]} />
+                            <View style={[styles.legendDot, { backgroundColor: '#2ecc71' }]} />
                             <Text style={styles.legendText}>Completado</Text>
                         </View>
                     </View>
@@ -194,11 +195,7 @@ const styles = StyleSheet.create({
         padding: 16,
         marginHorizontal: 4,
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        ...getShadowStyle('#000', 0, 2, 0.05, 4, 2),
     },
     summaryValue: {
         fontSize: 24,
@@ -217,11 +214,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderRadius: 16,
         padding: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
+        ...getShadowStyle('#000', 0, 2, 0.05, 8, 2),
     },
     heatmapTitle: {
         fontSize: 18,

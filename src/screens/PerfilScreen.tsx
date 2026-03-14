@@ -6,12 +6,24 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useHabitStore } from '../store/useHabitStore';
 import { notificationsService } from '../services/notificationsService';
 import { getLocalDateString } from '../utils/dateHelpers';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { MainStackParamList, MainTabParamList } from '../navigation/types';
+import { getShadowStyle } from '../utils/styleHelpers';
+
+type PerfilScreenNavigationProp = CompositeNavigationProp<
+    BottomTabNavigationProp<MainTabParamList, 'Perfil'>,
+    NativeStackNavigationProp<MainStackParamList>
+>;
 
 export default function PerfilScreen() {
     const { user, signOut } = useAuthStore();
     const { stats, loadStats, loadHabitsData } = useHabitStore();
     const [refreshing, setRefreshing] = useState(false);
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+    const navigation = useNavigation<PerfilScreenNavigationProp>();
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
@@ -50,8 +62,8 @@ export default function PerfilScreen() {
     };
 
     return (
-        <ScrollView 
-            style={styles.container} 
+        <ScrollView
+            style={styles.container}
             contentContainerStyle={styles.contentContainer}
             refreshControl={
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3498db']} />
@@ -98,12 +110,18 @@ export default function PerfilScreen() {
                         value={notificationsEnabled}
                     />
                 </View>
-                <TouchableOpacity style={styles.settingItem}>
+                <TouchableOpacity 
+                    style={styles.settingItem} 
+                    onPress={() => navigation.navigate('PrivacyTerms', { type: 'privacy' })}
+                >
                     <Ionicons name="shield-checkmark-outline" size={22} color="#444" style={styles.settingIcon} />
                     <Text style={styles.settingText}>Privacidad y Seguridad</Text>
                     <Ionicons name="chevron-forward" size={20} color="#ccc" style={styles.settingChevron} />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.settingItem}>
+                <TouchableOpacity 
+                    style={styles.settingItem}
+                    onPress={() => navigation.navigate('PrivacyTerms', { type: 'terms' })}
+                >
                     <Ionicons name="document-text-outline" size={22} color="#444" style={styles.settingIcon} />
                     <Text style={styles.settingText}>Términos y Condiciones</Text>
                     <Ionicons name="chevron-forward" size={20} color="#ccc" style={styles.settingChevron} />
@@ -141,11 +159,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 16,
-        elevation: 4,
-        shadowColor: '#3498db',
-        shadowOpacity: 0.3,
-        shadowOffset: { width: 0, height: 4 },
-        shadowRadius: 8,
+        ...getShadowStyle('#3498db', 0, 4, 0.3, 8, 4),
     },
     avatarText: {
         color: '#fff',
@@ -171,11 +185,7 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         alignItems: 'center',
         marginBottom: 12,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOpacity: 0.05,
-        shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 4,
+        ...getShadowStyle('#000', 0, 2, 0.05, 4, 2),
     },
     statValue: {
         fontSize: 28,
@@ -189,17 +199,20 @@ const styles = StyleSheet.create({
         color: '#888',
         fontWeight: '500',
     },
+    profileCard: {
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        padding: 24,
+        ...getShadowStyle('#000', 0, 4, 0.1, 12, 4),
+        marginBottom: 24,
+    },
     settingsGroup: {
         width: '100%',
         backgroundColor: '#fff',
         borderRadius: 16,
         paddingHorizontal: 16,
         marginBottom: 40,
-        elevation: 1,
-        shadowColor: '#000',
-        shadowOpacity: 0.03,
-        shadowOffset: { width: 0, height: 1 },
-        shadowRadius: 2,
+        ...getShadowStyle('#000', 0, 2, 0.05, 4, 1),
     },
     settingItem: {
         flexDirection: 'row',

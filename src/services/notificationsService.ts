@@ -31,6 +31,7 @@ export const notificationsService = {
 
   // Schedule a daily reminder to complete habits
   async scheduleDailyReminder(hour: number = 20, minute: number = 0): Promise<void> {
+    if (Platform.OS === 'web') return;
     await this.cancelAllReminders(); // Clear existing to avoid duplicates
 
     await Notifications.scheduleNotificationAsync({

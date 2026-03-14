@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { 
-    View, Text, TextInput, TouchableOpacity, StyleSheet, 
-    Alert, ActivityIndicator, KeyboardAvoidingView, Platform, 
+import {
+    View, Text, TextInput, TouchableOpacity, StyleSheet,
+    Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
     SafeAreaView, StatusBar
 } from 'react-native';
 import { supabase } from '../services/supabase';
@@ -9,10 +9,12 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../navigation/types';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { getShadowStyle } from '../utils/styleHelpers';
 
 type RegisterScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Register'>;
 
 export default function RegisterScreen() {
+    const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -20,14 +22,42 @@ export default function RegisterScreen() {
     const navigation = useNavigation<RegisterScreenNavigationProp>();
 
     const handleSignUp = async () => {
-        if (!email || !password) return Alert.alert('Error', 'Por favor ingresa un correo y contraseña válidos.');
+        if (!email || !password || !fullName) return Alert.alert('Error', 'Por favor completa todos los campos.');
+        if (password.length < 6) return Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres.');
+        
         setLoading(true);
-        const { error } = await supabase.auth.signUp({ email, password });
+        console.log('Intentando registro para:', email);
+        
+        const { data, error } = await supabase.auth.signUp({ 
+            email: email.trim(), 
+            password,
+            options: {
+                data: {
+                    full_name: fullName.trim()
+                }
+            }
+        });
+
         if (error) {
-            Alert.alert('Error', error.message);
+            console.error('Error de registro (Supabase):', {
+                message: error.message,
+                status: error.status,
+                name: error.name
+            });
+            
+            if (error.status === 422) {
+                Alert.alert('Error', 'Los datos proporcionados no son válidos o el correo ya está en uso.');
+            } else {
+                Alert.alert('Error', error.message);
+            }
         } else {
+            console.log('Registro exitoso:', data.user?.id);
             Alert.alert('¡Éxito!', 'Cuenta creada correctamente. Ya puedes iniciar sesión.');
-            navigation.goBack();
+            if (navigation.canGoBack()) {
+                navigation.goBack();
+            } else {
+                navigation.navigate('Login');
+            }
         }
         setLoading(false);
     };
@@ -35,11 +65,14 @@ export default function RegisterScreen() {
     return (
         <SafeAreaView style={styles.safeArea}>
             <StatusBar barStyle="dark-content" backgroundColor="#f5f7fa" />
-            <KeyboardAvoidingView 
+            <KeyboardAvoidingView
                 style={styles.container}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
-                <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+                <TouchableOpacity 
+                    style={styles.backButton} 
+                    onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Login')}
+                >
                     <Ionicons name="arrow-back" size={24} color="#333" />
                 </TouchableOpacity>
 
@@ -49,6 +82,20 @@ export default function RegisterScreen() {
                 </View>
 
                 <View style={styles.card}>
+                    <View style={styles.inputContainer}>
+                        <Text style={styles.label}>Nombre Completo</Text>
+                        <View style={styles.inputWrapper}>
+                            <Ionicons name="person-outline" size={20} color="#888" style={styles.inputIcon} />
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Ej: Juan Pérez"
+                                placeholderTextColor="#bbb"
+                                value={fullName}
+                                onChangeText={setFullName}
+                            />
+                        </View>
+                    </View>
+
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Correo Electrónico</Text>
                         <View style={styles.inputWrapper}>
@@ -77,8 +124,8 @@ export default function RegisterScreen() {
                                 value={password}
                                 onChangeText={setPassword}
                             />
-                            <TouchableOpacity 
-                                style={styles.eyeIcon} 
+                            <TouchableOpacity
+                                style={styles.eyeIcon}
                                 onPress={() => setShowPassword(!showPassword)}
                             >
                                 <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#888" />
@@ -98,9 +145,9 @@ export default function RegisterScreen() {
                             <Text style={styles.primaryButtonText}>Registrarse</Text>
                         )}
                     </TouchableOpacity>
-                    
+
                     <Text style={styles.termsText}>
-                        Al registrarte, aceptas nuestros <Text style={styles.termsLink}>Términos de Servicio</Text> y <Text style={styles.termsLink}>Política de Privacidad</Text>.
+                        Al registrarte, aceptas nuestros <Text style={styles.termsLink} onPress={() => navigation.navigate('PrivacyTerms', { type: 'terms' })}>Términos de Servicio</Text> y <Text style={styles.termsLink} onPress={() => navigation.navigate('PrivacyTerms', { type: 'privacy' })}>Política de Privacidad</Text>.
                     </Text>
                 </View>
 
@@ -115,6 +162,12 @@ export default function RegisterScreen() {
         </SafeAreaView>
     );
 }
+
+const shadows = {
+    logo: getShadowStyle('#3498db', 0, 8, 0.15, 12, 10),
+    card: getShadowStyle('#000', 0, 10, 0.05, 20, 5),
+    button: getShadowStyle('#3498db', 0, 4, 0.3, 8, 4),
+};
 
 const styles = StyleSheet.create({
     safeArea: {
@@ -136,11 +189,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        ...getShadowStyle('#000', 0, 2, 0.1, 4, 3),
         zIndex: 10,
     },
     header: {
@@ -162,11 +211,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderRadius: 24,
         padding: 24,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.05,
-        shadowRadius: 20,
-        elevation: 5,
+        ...shadows.card,
     },
     inputContainer: {
         marginBottom: 20,
@@ -211,11 +256,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         alignItems: 'center',
         marginTop: 8,
-        shadowColor: '#3498db',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
+        ...shadows.button,
     },
     primaryButtonDisabled: {
         backgroundColor: '#95c6e8',

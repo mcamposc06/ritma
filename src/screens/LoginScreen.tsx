@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { 
-    View, Text, TextInput, TouchableOpacity, StyleSheet, 
-    Alert, ActivityIndicator, KeyboardAvoidingView, Platform, 
+import {
+    View, Text, TextInput, TouchableOpacity, StyleSheet,
+    Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
     SafeAreaView, StatusBar
 } from 'react-native';
 import { supabase } from '../services/supabase';
@@ -9,6 +9,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../navigation/types';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { getShadowStyle } from '../utils/styleHelpers';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
@@ -19,18 +20,38 @@ export default function LoginScreen() {
     const [showPassword, setShowPassword] = useState(false);
     const navigation = useNavigation<LoginScreenNavigationProp>();
 
-    const handleSignIn = async () => {
-        if (!email || !password) return Alert.alert('Error', 'Por favor ingresa tu correo y contraseña.');
+    const handleLogin = async () => {
+        if (!email || !password) return Alert.alert('Error', 'Por favor completa todos los campos.');
         setLoading(true);
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) Alert.alert('Error', error.message);
+        console.log('Intentando inicio de sesión para:', email);
+        
+        const { data, error } = await supabase.auth.signInWithPassword({ 
+            email: email.trim(), 
+            password 
+        });
+
+        if (error) {
+            console.error('Error de inicio de sesión (Supabase):', {
+                message: error.message,
+                status: error.status,
+                name: error.name
+            });
+            
+            if (error.message.includes('Invalid login credentials')) {
+                Alert.alert('Error', 'Correo o contraseña incorrectos. Por favor, verifica tus datos.');
+            } else {
+                Alert.alert('Error', error.message);
+            }
+        } else {
+            console.log('Inicio de sesión exitoso:', data.user?.id);
+        }
         setLoading(false);
     };
 
     return (
         <SafeAreaView style={styles.safeArea}>
             <StatusBar barStyle="dark-content" backgroundColor="#f5f7fa" />
-            <KeyboardAvoidingView 
+            <KeyboardAvoidingView
                 style={styles.container}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
@@ -44,7 +65,7 @@ export default function LoginScreen() {
 
                 <View style={styles.card}>
                     <Text style={styles.cardTitle}>Iniciar Sesión</Text>
-                    
+
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Correo Electrónico</Text>
                         <View style={styles.inputWrapper}>
@@ -73,8 +94,8 @@ export default function LoginScreen() {
                                 value={password}
                                 onChangeText={setPassword}
                             />
-                            <TouchableOpacity 
-                                style={styles.eyeIcon} 
+                            <TouchableOpacity
+                                style={styles.eyeIcon}
                                 onPress={() => setShowPassword(!showPassword)}
                             >
                                 <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#888" />
@@ -119,7 +140,7 @@ export default function LoginScreen() {
 
                     <TouchableOpacity
                         style={[styles.primaryButton, loading && styles.primaryButtonDisabled]}
-                        onPress={handleSignIn}
+                        onPress={handleLogin}
                         disabled={loading}
                     >
                         {loading ? (
@@ -141,6 +162,12 @@ export default function LoginScreen() {
         </SafeAreaView>
     );
 }
+
+const shadows = {
+    logo: getShadowStyle('#3498db', 0, 8, 0.15, 12, 10),
+    card: getShadowStyle('#000', 0, 10, 0.05, 20, 5),
+    button: getShadowStyle('#3498db', 0, 4, 0.3, 8, 4),
+};
 
 const styles = StyleSheet.create({
     safeArea: {
@@ -164,11 +191,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 16,
-        shadowColor: '#3498db',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-        elevation: 10,
+        ...shadows.logo,
     },
     title: {
         fontSize: 36,
@@ -186,11 +209,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderRadius: 24,
         padding: 24,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.05,
-        shadowRadius: 20,
-        elevation: 5,
+        ...shadows.card,
     },
     cardTitle: {
         fontSize: 22,
@@ -244,11 +263,7 @@ const styles = StyleSheet.create({
         padding: 18,
         borderRadius: 12,
         alignItems: 'center',
-        shadowColor: '#3498db',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
+        ...shadows.button,
     },
     primaryButtonDisabled: {
         backgroundColor: '#95c6e8',
