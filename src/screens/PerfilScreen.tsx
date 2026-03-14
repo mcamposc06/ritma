@@ -5,22 +5,23 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../store/useAuthStore';
 import { useHabitStore } from '../store/useHabitStore';
 import { notificationsService } from '../services/notificationsService';
+import { supabase } from '../services/supabase';
 import { getLocalDateString } from '../utils/dateHelpers';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { CompositeNavigationProp } from '@react-navigation/native';
-import { MainStackParamList, MainTabParamList } from '../navigation/types';
+import { MainStackParamList, TabParamList } from '../navigation/types';
 import { getShadowStyle } from '../utils/styleHelpers';
 
 type PerfilScreenNavigationProp = CompositeNavigationProp<
-    BottomTabNavigationProp<MainTabParamList, 'Perfil'>,
+    BottomTabNavigationProp<TabParamList, 'Perfil'>,
     NativeStackNavigationProp<MainStackParamList>
 >;
 
 export default function PerfilScreen() {
     const { user, signOut } = useAuthStore();
-    const { stats, loadStats, loadHabitsData } = useHabitStore();
+    const { stats, loadStats, loadHabitsData, error, clearError } = useHabitStore();
     const [refreshing, setRefreshing] = useState(false);
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
     const navigation = useNavigation<PerfilScreenNavigationProp>();
@@ -41,6 +42,14 @@ export default function PerfilScreen() {
             }
         });
     }, [loadStats, loadHabitsData]);
+
+    // show errors
+    useEffect(() => {
+        if (error) {
+            Alert.alert('Error', error);
+            clearError();
+        }
+    }, [error, clearError]);
 
     const toggleNotifications = async (value: boolean) => {
         if (value) {
@@ -110,6 +119,57 @@ export default function PerfilScreen() {
                         value={notificationsEnabled}
                     />
                 </View>
+                <TouchableOpacity style={styles.settingItem} onPress={async () => {
+                    if (Alert.prompt) {
+                        Alert.prompt(
+                            'Cambiar contraseña',
+                            'Ingresa tu nueva contraseña (min 6 caracteres)',
+                            async (pwd: string) => {
+                                if (!pwd || pwd.length < 6) return Alert.alert('Error','La contraseña debe tener al menos 6 caracteres');
+                                try {
+                                    const { error } = await supabase.auth.updateUser({ password: pwd });
+                                    if (error) throw error;
+                                    Alert.alert('¡Listo!', 'Contraseña actualizada.');
+                                } catch (e: any) {
+                                    Alert.alert('Error', e.message || 'No se pudo cambiar contraseña');
+                                }
+                            },
+                            'secure-text'
+                        );
+                    } else {
+                        Alert.alert('Función no disponible', 'Actualiza tu contraseña desde la web o en un dispositivo que soporte prompts.');
+                    }
+                }}>
+                    <Ionicons name="key-outline" size={22} color="#444" style={styles.settingIcon} />
+                    <Text style={styles.settingText}>Cambiar contraseña</Text>
+                    <Ionicons name="chevron-forward" size={20} color="#ccc" style={styles.settingChevron} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.settingItem} onPress={async () => {
+                    if (Alert.prompt) {
+                        Alert.prompt(
+                            'Actualizar correo',
+                            'Ingresa tu nuevo correo electrónico',
+                            async (newEmail: string) => {
+                                if (!newEmail) return;
+                                try {
+                                    const { error } = await supabase.auth.updateUser({ email: newEmail });
+                                    if (error) throw error;
+                                    Alert.alert('¡Listo!', 'Correo actualizado.');
+                                } catch (e: any) {
+                                    Alert.alert('Error', e.message || 'No se pudo actualizar correo');
+                                }
+                            },
+                            'plain-text',
+                            user?.email || ''
+                        );
+                    } else {
+                        Alert.alert('Función no disponible', 'Actualiza tu correo desde la web o en un dispositivo que soporte prompts.');
+                    }
+                }}>
+                    <Ionicons name="mail-outline" size={22} color="#444" style={styles.settingIcon} />
+                    <Text style={styles.settingText}>Actualizar correo</Text>
+                    <Ionicons name="chevron-forward" size={20} color="#ccc" style={styles.settingChevron} />
+                </TouchableOpacity>
                 <TouchableOpacity 
                     style={styles.settingItem} 
                     onPress={() => navigation.navigate('PrivacyTerms', { type: 'privacy' })}

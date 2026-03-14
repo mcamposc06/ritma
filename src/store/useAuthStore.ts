@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
+import { useHabitStore } from './useHabitStore';
 
 interface AuthState {
     session: Session | null;
@@ -41,5 +42,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ isLoading: true });
         await supabase.auth.signOut();
         set({ session: null, user: null, isLoading: false });
+        // clear habit data as well
+        useHabitStore.getState().reset();
     }
 }));

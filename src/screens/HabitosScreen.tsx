@@ -7,21 +7,29 @@ import { Habit } from '../types';
 import { getLocalDateString } from '../utils/dateHelpers';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { MainStackParamList, MainTabParamList } from '../navigation/types';
+import { MainStackParamList, TabParamList } from '../navigation/types';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { getShadowStyle } from '../utils/styleHelpers';
 
 type HabitosScreenNavigationProp = CompositeNavigationProp<
-    BottomTabNavigationProp<MainTabParamList, 'Habitos'>,
+    BottomTabNavigationProp<TabParamList, 'Habitos'>,
     NativeStackNavigationProp<MainStackParamList>
 >;
 
 export default function HabitosScreen() {
-    const { habits, isLoading, loadHabitsData, deleteHabit } = useHabitStore();
+    const { habits, isLoading, loadHabitsData, deleteHabit, error, clearError } = useHabitStore();
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [habitToEdit, setHabitToEdit] = useState<Habit | null>(null);
     const navigation = useNavigation<HabitosScreenNavigationProp>();
+
+    // show errors as alerts
+    useEffect(() => {
+        if (error) {
+            Alert.alert('Error', error);
+            clearError();
+        }
+    }, [error, clearError]);
 
     // Load data when mounting / refreshing
     const loadData = useCallback(() => {
@@ -87,6 +95,12 @@ export default function HabitosScreen() {
             </TouchableOpacity>
             
             <View style={styles.actionsContainer}>
+                <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={() => navigation.navigate('HabitHistory', { habitId: item.id, title: item.title })}
+                >
+                    <Ionicons name="calendar-outline" size={20} color="#9b59b6" />
+                </TouchableOpacity>
                 <TouchableOpacity 
                     style={styles.actionButton}
                     onPress={() => handleEdit(item)}

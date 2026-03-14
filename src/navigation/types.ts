@@ -6,17 +6,20 @@ export type AuthStackParamList = {
     PrivacyTerms: { type: 'privacy' | 'terms' };
 };
 
-export type MainTabParamList = {
+// bottom tab nav parameters
+export type TabParamList = {
     Home: undefined;
     Habitos: undefined;
     Estadisticas: undefined;
     Perfil: undefined;
 };
 
+// stack above tabs – allows pushing screens like history, detail, and privacy
 export type MainStackParamList = {
-    MainTabs: NavigatorScreenParams<MainTabParamList>;
+    Tabs: NavigatorScreenParams<TabParamList>;
     PrivacyTerms: { type: 'privacy' | 'terms' };
     HabitDetail: { habitId: string };
+    HabitHistory: { habitId: string; title: string };
 };
 
 export type RootStackParamList = {

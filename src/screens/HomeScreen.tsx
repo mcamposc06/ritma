@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Animated, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import ConfettiCannon from 'react-native-confetti-cannon';
@@ -12,10 +12,10 @@ import { getLocalDateString, getGreeting } from '../utils/dateHelpers';
 import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { MainStackParamList, MainTabParamList } from '../navigation/types';
+import { MainStackParamList, TabParamList } from '../navigation/types';
 
 type HomeScreenNavigationProp = CompositeNavigationProp<
-    BottomTabNavigationProp<MainTabParamList, 'Home'>,
+    BottomTabNavigationProp<TabParamList, 'Home'>,
     NativeStackNavigationProp<MainStackParamList>
 >;
 
@@ -36,7 +36,7 @@ const getDayNumberToEnum = (): DayOfWeek => {
 
 export default function HomeScreen() {
     const { user } = useAuthStore();
-    const { habitsWithCompletion, isLoading, loadHabitsData, toggleHabitCompletion } = useHabitStore();
+    const { habitsWithCompletion, isLoading, loadHabitsData, toggleHabitCompletion, error, clearError } = useHabitStore();
     const navigation = useNavigation<HomeScreenNavigationProp>();
     const progressAnim = useRef(new Animated.Value(0)).current;
     const [showConfetti, setShowConfetti] = useState(false);
@@ -49,6 +49,14 @@ export default function HomeScreen() {
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    // show errors
+    useEffect(() => {
+        if (error) {
+            Alert.alert('Error', error);
+            clearError();
+        }
+    }, [error, clearError]);
 
     const handleToggleHabit = async (habitId: string, isCompleted: boolean) => {
         // Trigger haptic feedback

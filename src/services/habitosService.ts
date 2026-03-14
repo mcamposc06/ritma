@@ -125,6 +125,31 @@ export const habitosService = {
     if (error) throw error;
   },
 
+  // Fetch all logs for a specific habit
+  async getLogsByHabit(habitId: string): Promise<DailyLog[]> {
+    const { data, error } = await supabase
+      .from('daily_logs')
+      .select('*')
+      .eq('habit_id', habitId)
+      .order('log_date', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  // Fetch logs in a date range (inclusive)
+  async getLogsInRange(startDate: string, endDate: string): Promise<DailyLog[]> {
+    const { data, error } = await supabase
+      .from('daily_logs')
+      .select('*')
+      .gte('log_date', startDate)
+      .lte('log_date', endDate)
+      .order('log_date', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  },
+
   // Get user overall stats (total habits, total completions)
   async getStats(): Promise<{ totalHabits: number, totalCompletions: number }> {
     const { data: userData, error: userError } = await supabase.auth.getUser();
