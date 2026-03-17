@@ -122,6 +122,34 @@ export default function PerfilScreen() {
                 <TouchableOpacity style={styles.settingItem} onPress={async () => {
                     if (Alert.prompt) {
                         Alert.prompt(
+                            'Actualizar nombre',
+                            'Ingresa tu nombre completo',
+                            async (newName: string) => {
+                                if (!newName) return;
+                                try {
+                                    const { error } = await supabase.auth.updateUser({ 
+                                        data: { full_name: newName.trim() } 
+                                    });
+                                    if (error) throw error;
+                                    Alert.alert('¡Listo!', 'Nombre actualizado. Los cambios se verán al reiniciar o recargar.');
+                                } catch (e: any) {
+                                    Alert.alert('Error', e.message || 'No se pudo actualizar el nombre');
+                                }
+                            },
+                            'plain-text',
+                            user?.user_metadata?.full_name || ''
+                        );
+                    } else {
+                        Alert.alert('Función no disponible', 'Actualiza tu nombre desde la configuración de tu cuenta.');
+                    }
+                }}>
+                    <Ionicons name="person-outline" size={22} color="#444" style={styles.settingIcon} />
+                    <Text style={styles.settingText}>Actualizar nombre</Text>
+                    <Ionicons name="chevron-forward" size={20} color="#ccc" style={styles.settingChevron} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.settingItem} onPress={async () => {
+                    if (Alert.prompt) {
+                        Alert.prompt(
                             'Cambiar contraseña',
                             'Ingresa tu nueva contraseña (min 6 caracteres)',
                             async (pwd: string) => {
