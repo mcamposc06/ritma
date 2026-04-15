@@ -12,6 +12,7 @@ import { AuthStackParamList } from '../navigation/types';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { getShadowStyle } from '../utils/styleHelpers';
+import { useAppTheme } from '../utils/theme';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
@@ -23,6 +24,7 @@ export default function LoginScreen() {
     const [loadingProvider, setLoadingProvider] = useState<'password' | 'google' | null>(null);
     const [showPassword, setShowPassword] = useState(false);
     const navigation = useNavigation<LoginScreenNavigationProp>();
+    const { colors, isDark } = useAppTheme();
 
     const isPasswordLoading = loadingProvider === 'password';
     const isGoogleLoading = loadingProvider === 'google';
@@ -128,52 +130,64 @@ export default function LoginScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.safeArea}>
-            <StatusBar barStyle="dark-content" backgroundColor="#f5f7fa" />
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+            <StatusBar
+                barStyle={isDark ? 'light-content' : 'dark-content'}
+                backgroundColor={colors.background}
+            />
             <KeyboardAvoidingView
                 style={styles.container}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
                 <View style={styles.header}>
-                    <View style={styles.logoContainer}>
-                        <Ionicons name="leaf" size={48} color="#3498db" />
+                    <View style={[styles.logoContainer, { backgroundColor: colors.card }]}>
+                        <Ionicons name="leaf" size={48} color={colors.primary} />
                     </View>
-                    <Text style={styles.title}>Ritma</Text>
-                    <Text style={styles.subtitle}>Encuentra tu ritmo, transforma tu vida.</Text>
+                    <Text style={[styles.title, { color: colors.text }]}>Ritma</Text>
+                    <Text style={[styles.subtitle, { color: colors.textMuted }]}>Encuentra tu ritmo, transforma tu vida.</Text>
                 </View>
 
-                <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Iniciar Sesión</Text>
+                <View style={[styles.card, { backgroundColor: colors.card }]}>
+                    <Text style={[styles.cardTitle, { color: colors.text }]}>Iniciar Sesión</Text>
 
                     <TouchableOpacity
-                        style={[styles.socialButton, isBusy && styles.socialButtonDisabled]}
+                        style={[
+                            styles.socialButton,
+                            { backgroundColor: colors.card, borderColor: colors.inputBorder },
+                            isBusy && styles.socialButtonDisabled,
+                        ]}
                         onPress={handleGoogleLogin}
                         disabled={isBusy}
                     >
                         {isGoogleLoading ? (
-                            <ActivityIndicator color="#1a1a2e" />
+                            <ActivityIndicator color={colors.text} />
                         ) : (
                             <>
-                                <Ionicons name="logo-google" size={20} color="#1a1a2e" style={styles.socialIcon} />
-                                <Text style={styles.socialButtonText}>Continuar con Google</Text>
+                                <Ionicons name="logo-google" size={20} color={colors.text} style={styles.socialIcon} />
+                                <Text style={[styles.socialButtonText, { color: colors.text }]}>Continuar con Google</Text>
                             </>
                         )}
                     </TouchableOpacity>
 
                     <View style={styles.dividerRow}>
-                        <View style={styles.dividerLine} />
-                        <Text style={styles.dividerText}>o</Text>
-                        <View style={styles.dividerLine} />
+                        <View style={[styles.dividerLine, { backgroundColor: colors.inputBorder }]} />
+                        <Text style={[styles.dividerText, { color: colors.textMuted }]}>o</Text>
+                        <View style={[styles.dividerLine, { backgroundColor: colors.inputBorder }]} />
                     </View>
 
                     <View style={styles.inputContainer}>
-                        <Text style={styles.label}>Correo Electrónico</Text>
-                        <View style={styles.inputWrapper}>
-                            <Ionicons name="mail-outline" size={20} color="#888" style={styles.inputIcon} />
+                        <Text style={[styles.label, { color: colors.textMuted }]}>Correo Electrónico</Text>
+                        <View
+                            style={[
+                                styles.inputWrapper,
+                                { backgroundColor: colors.inputBg, borderColor: colors.inputBorder },
+                            ]}
+                        >
+                            <Ionicons name="mail-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { color: colors.text }]}
                                 placeholder="tu@correo.com"
-                                placeholderTextColor="#bbb"
+                                placeholderTextColor={colors.textMuted}
                                 autoCapitalize="none"
                                 keyboardType="email-address"
                                 value={email}
@@ -183,13 +197,18 @@ export default function LoginScreen() {
                     </View>
 
                     <View style={styles.inputContainer}>
-                        <Text style={styles.label}>Contraseña</Text>
-                        <View style={styles.inputWrapper}>
-                            <Ionicons name="lock-closed-outline" size={20} color="#888" style={styles.inputIcon} />
+                        <Text style={[styles.label, { color: colors.textMuted }]}>Contraseña</Text>
+                        <View
+                            style={[
+                                styles.inputWrapper,
+                                { backgroundColor: colors.inputBg, borderColor: colors.inputBorder },
+                            ]}
+                        >
+                            <Ionicons name="lock-closed-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { color: colors.text }]}
                                 placeholder="Ingresa tu contraseña"
-                                placeholderTextColor="#bbb"
+                                placeholderTextColor={colors.textMuted}
                                 secureTextEntry={!showPassword}
                                 value={password}
                                 onChangeText={setPassword}
@@ -198,7 +217,11 @@ export default function LoginScreen() {
                                 style={styles.eyeIcon}
                                 onPress={() => setShowPassword(!showPassword)}
                             >
-                                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color="#888" />
+                                <Ionicons
+                                    name={showPassword ? "eye-off-outline" : "eye-outline"}
+                                    size={20}
+                                    color={colors.textMuted}
+                                />
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -235,11 +258,15 @@ export default function LoginScreen() {
                                 });
                             })();
                     }} disabled={isBusy}>
-                        <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
+                        <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>¿Olvidaste tu contraseña?</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                        style={[styles.primaryButton, isBusy && styles.primaryButtonDisabled]}
+                        style={[
+                            styles.primaryButton,
+                            { backgroundColor: colors.primary },
+                            isBusy && { opacity: 0.6, shadowOpacity: 0 },
+                        ]}
                         onPress={handleLogin}
                         disabled={isBusy}
                     >
@@ -252,9 +279,9 @@ export default function LoginScreen() {
                 </View>
 
                 <View style={styles.footer}>
-                    <Text style={styles.footerText}>¿No tienes una cuenta? </Text>
+                    <Text style={[styles.footerText, { color: colors.textMuted }]}>¿No tienes una cuenta? </Text>
                     <TouchableOpacity onPress={() => navigation.navigate('Register')} disabled={isBusy}>
-                        <Text style={styles.footerLink}>Regístrate</Text>
+                        <Text style={[styles.footerLink, { color: colors.primary }]}>Regístrate</Text>
                     </TouchableOpacity>
                 </View>
 

@@ -27,25 +27,34 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { MainStackParamList, TabParamList } from '../navigation/types';
 import { getShadowStyle } from '../utils/styleHelpers';
+import { useAppTheme } from '../utils/theme';
 
 type PerfilScreenNavigationProp = CompositeNavigationProp<
     BottomTabNavigationProp<TabParamList, 'Perfil'>,
     NativeStackNavigationProp<MainStackParamList>
 >;
 
-type ProfilePromptKind = 'name' | 'password' | 'email';
+type ProfilePromptKind = 'name' | 'password' | 'email' | 'reminderTime';
 
 export default function PerfilScreen() {
     const { user, signOut } = useAuthStore();
     const { stats, loadStats, loadHabitsData, error, clearError } = useHabitStore();
     const [refreshing, setRefreshing] = useState(false);
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+    const [dailyReminderTime, setDailyReminderTime] = useState({ hour: 20, minute: 0 });
     const [promptVisible, setPromptVisible] = useState(false);
     const [promptKind, setPromptKind] = useState<ProfilePromptKind | null>(null);
     const [promptValue, setPromptValue] = useState('');
     const [promptLoading, setPromptLoading] = useState(false);
     const [showPromptValue, setShowPromptValue] = useState(false);
     const navigation = useNavigation<PerfilScreenNavigationProp>();
+    const { isDark, setDarkMode, colors } = useAppTheme();
+
+    const reminderTimeLabel = `${String(dailyReminderTime.hour).padStart(2, '0')}:${String(dailyReminderTime.minute).padStart(2, '0')}`;
+
+    const toggleDarkMode = async (value: boolean) => {
+        await setDarkMode(value);
+    };
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
@@ -56,11 +65,18 @@ export default function PerfilScreen() {
 
     useEffect(() => {
         loadHabitsData(getLocalDateString()).then(() => loadStats());
-        // Load notification preference
+        // Load notification preferences
         AsyncStorage.getItem('notificationsEnabled').then(val => {
             if (val === 'true') {
                 setNotificationsEnabled(true);
             }
+        });
+
+        AsyncStorage.getItem('dailyReminderTime').then(val => {
+            if (!val) return;
+            const match = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/.exec(val);
+            if (!match) return;
+            setDailyReminderTime({ hour: Number(match[1]), minute: Number(match[2]) });
         });
     }, [loadStats, loadHabitsData]);
 
@@ -73,21 +89,26 @@ export default function PerfilScreen() {
     }, [error, clearError]);
 
     const toggleNotifications = async (value: boolean) => {
+        if (Platform.OS === 'web') {
+            Alert.alert('No disponible', 'Los recordatorios no están disponibles en web.');
+            return;
+        }
+
         if (value) {
             const granted = await notificationsService.requestPermissions();
             if (granted) {
-                await notificationsService.scheduleDailyReminder(20, 0); // Schedule for 8:00 PM
+                await notificationsService.scheduleDailyReminder(dailyReminderTime.hour, dailyReminderTime.minute);
                 setNotificationsEnabled(true);
-                AsyncStorage.setItem('notificationsEnabled', 'true');
-                Alert.alert("Notificaciones activas", "Te recordaremos todos los días a las 8:00 PM.");
+                await AsyncStorage.setItem('notificationsEnabled', 'true');
+                Alert.alert('Notificaciones activas', `Te recordaremos todos los días a las ${reminderTimeLabel}.`);
             } else {
-                Alert.alert("Permisos denegados", "Debes activar las notificaciones en los ajustes de tu dispositivo.");
+                Alert.alert('Permisos denegados', 'Debes activar las notificaciones en los ajustes de tu dispositivo.');
                 setNotificationsEnabled(false);
             }
         } else {
             await notificationsService.cancelAllReminders();
             setNotificationsEnabled(false);
-            AsyncStorage.setItem('notificationsEnabled', 'false');
+            await AsyncStorage.setItem('notificationsEnabled', 'false');
         }
     };
 
@@ -104,6 +125,8 @@ export default function PerfilScreen() {
             setPromptValue((user.user_metadata?.full_name as string | undefined) || '');
         } else if (kind === 'email') {
             setPromptValue(user.email || '');
+        } else if (kind === 'reminderTime') {
+            setPromptValue(reminderTimeLabel);
         } else {
             setPromptValue('');
         }
@@ -128,21 +151,27 @@ export default function PerfilScreen() {
             ? 'Actualizar nombre'
             : promptKind === 'password'
                 ? 'Cambiar contraseña'
-                : 'Actualizar correo';
+                : promptKind === 'email'
+                    ? 'Actualizar correo'
+                    : 'Hora del recordatorio';
 
     const promptHint =
         promptKind === 'name'
             ? 'Ingresa tu nombre completo'
             : promptKind === 'password'
                 ? 'Mínimo 6 caracteres'
-                : 'Ingresa tu nuevo correo electrónico';
+                : promptKind === 'email'
+                    ? 'Ingresa tu nuevo correo electrónico'
+                    : 'Formato HH:MM (ej: 20:00)';
 
     const promptPlaceholder =
         promptKind === 'name'
             ? 'Ej: Juan Pérez'
             : promptKind === 'password'
                 ? 'Nueva contraseña'
-                : 'nuevo@correo.com';
+                : promptKind === 'email'
+                    ? 'nuevo@correo.com'
+                    : '20:00';
 
     const handlePromptConfirm = async () => {
         if (!promptKind) return;
@@ -153,6 +182,40 @@ export default function PerfilScreen() {
         }
 
         const rawValue = kind === 'password' ? promptValue : promptValue.trim();
+
+        if (kind === 'reminderTime') {
+            const match = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/.exec(rawValue);
+            if (!match) {
+                return Alert.alert('Error', 'Formato inválido. Usa HH:MM (ej: 20:00).');
+            }
+
+            const hour = Number(match[1]);
+            const minute = Number(match[2]);
+            const normalized = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+
+            setPromptLoading(true);
+            try {
+                await AsyncStorage.setItem('dailyReminderTime', normalized);
+                setDailyReminderTime({ hour, minute });
+
+                if (notificationsEnabled && Platform.OS !== 'web') {
+                    await notificationsService.scheduleDailyReminder(hour, minute);
+                }
+
+                forceClosePrompt();
+
+                const message = Platform.OS === 'web'
+                    ? 'Hora guardada. Los recordatorios solo están disponibles en móvil.'
+                    : 'Hora del recordatorio actualizada.';
+
+                Alert.alert('¡Listo!', message);
+            } catch (e: any) {
+                Alert.alert('Error', e?.message || 'No se pudo actualizar la hora.');
+            } finally {
+                setPromptLoading(false);
+            }
+            return;
+        }
 
         if (kind === 'name') {
             if (!rawValue) return Alert.alert('Error', 'Ingresa tu nombre.');
@@ -200,89 +263,125 @@ export default function PerfilScreen() {
     return (
         <View style={{ flex: 1 }}>
             <ScrollView
-                style={styles.container}
+                style={[styles.container, { backgroundColor: colors.background }]}
                 contentContainerStyle={styles.contentContainer}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3498db']} />
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={[colors.primary]}
+                        tintColor={colors.primary}
+                    />
                 }
             >
             <View style={styles.header}>
                 <View style={styles.avatarPlaceholder}>
                     <Text style={styles.avatarText}>{user?.email?.charAt(0).toUpperCase()}</Text>
                 </View>
-                <Text style={styles.emailText}>{user?.email}</Text>
+                <Text style={[styles.emailText, { color: colors.text }]}>{user?.email}</Text>
             </View>
 
             <View style={styles.statsContainer}>
-                <View style={styles.statBox}>
-                    <Ionicons name="documents-outline" size={24} color="#3498db" />
-                    <Text style={styles.statValue}>{stats.totalHabits}</Text>
-                    <Text style={styles.statLabel}>Activos</Text>
+                <View style={[styles.statBox, { backgroundColor: colors.card }]}>
+                    <Ionicons name="documents-outline" size={24} color={colors.primary} />
+                    <Text style={[styles.statValue, { color: colors.text }]}>{stats.totalHabits}</Text>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Activos</Text>
                 </View>
-                <View style={styles.statBox}>
-                    <Ionicons name="checkmark-circle-outline" size={24} color="#2ecc71" />
-                    <Text style={styles.statValue}>{stats.totalCompletions}</Text>
-                    <Text style={styles.statLabel}>Completados</Text>
+                <View style={[styles.statBox, { backgroundColor: colors.card }]}>
+                    <Ionicons name="checkmark-circle-outline" size={24} color={colors.success} />
+                    <Text style={[styles.statValue, { color: colors.text }]}>{stats.totalCompletions}</Text>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Completados</Text>
                 </View>
-                <View style={styles.statBox}>
-                    <Ionicons name="flame-outline" size={24} color="#e67e22" />
-                    <Text style={styles.statValue}>{stats.bestStreak}</Text>
-                    <Text style={styles.statLabel}>Mejor Racha</Text>
+                <View style={[styles.statBox, { backgroundColor: colors.card }]}>
+                    <Ionicons name="flame-outline" size={24} color={colors.warning} />
+                    <Text style={[styles.statValue, { color: colors.text }]}>{stats.bestStreak}</Text>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Mejor Racha</Text>
                 </View>
-                <View style={styles.statBox}>
-                    <Ionicons name="trending-up-outline" size={24} color="#9b59b6" />
-                    <Text style={styles.statValue}>{stats.weeklyRate}%</Text>
-                    <Text style={styles.statLabel}>Semanal</Text>
+                <View style={[styles.statBox, { backgroundColor: colors.card }]}>
+                    <Ionicons name="trending-up-outline" size={24} color={colors.primary} />
+                    <Text style={[styles.statValue, { color: colors.text }]}>{stats.weeklyRate}%</Text>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Semanal</Text>
                 </View>
             </View>
 
-            <View style={styles.settingsGroup}>
-                <View style={styles.settingItem}>
-                    <Ionicons name="notifications-outline" size={22} color="#444" style={styles.settingIcon} />
-                    <Text style={styles.settingText}>Recordatorio Diario (8 PM)</Text>
+            <View style={[styles.settingsGroup, { backgroundColor: colors.card }]}>
+                <View style={[styles.settingItem, { borderBottomColor: colors.border }]}>
+                    <Ionicons name="moon-outline" size={22} color={colors.textMuted} style={styles.settingIcon} />
+                    <Text style={[styles.settingText, { color: colors.text }]}>Modo oscuro</Text>
                     <Switch
                         trackColor={{ false: '#767577', true: '#81b0ff' }}
-                        thumbColor={notificationsEnabled ? '#3498db' : '#f4f3f4'}
-                        onValueChange={toggleNotifications}
-                        value={notificationsEnabled}
+                        thumbColor={isDark ? colors.primary : '#f4f3f4'}
+                        onValueChange={toggleDarkMode}
+                        value={isDark}
                     />
                 </View>
-                <TouchableOpacity style={styles.settingItem} onPress={() => openPrompt('name')}>
-                    <Ionicons name="person-outline" size={22} color="#444" style={styles.settingIcon} />
-                    <Text style={styles.settingText}>Actualizar nombre</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#ccc" style={styles.settingChevron} />
+                <View style={[styles.settingItem, { borderBottomColor: colors.border }]}>
+                    <Ionicons name="notifications-outline" size={22} color={colors.textMuted} style={styles.settingIcon} />
+                    <Text style={[styles.settingText, { color: colors.text }]}>Recordatorio diario ({reminderTimeLabel})</Text>
+                    <Switch
+                        trackColor={{ false: '#767577', true: '#81b0ff' }}
+                        thumbColor={notificationsEnabled ? colors.primary : '#f4f3f4'}
+                        onValueChange={toggleNotifications}
+                        value={notificationsEnabled}
+                        disabled={Platform.OS === 'web'}
+                    />
+                </View>
+                <TouchableOpacity
+                    style={[styles.settingItem, { borderBottomColor: colors.border }]}
+                    onPress={() => openPrompt('reminderTime')}
+                >
+                    <Ionicons name="time-outline" size={22} color={colors.textMuted} style={styles.settingIcon} />
+                    <Text style={[styles.settingText, { color: colors.text }]}>Cambiar hora del recordatorio</Text>
+                    <Ionicons name="chevron-forward" size={20} color={colors.border} style={styles.settingChevron} />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.settingItem} onPress={() => openPrompt('password')}>
-                    <Ionicons name="key-outline" size={22} color="#444" style={styles.settingIcon} />
-                    <Text style={styles.settingText}>Cambiar contraseña</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#ccc" style={styles.settingChevron} />
+                <TouchableOpacity
+                    style={[styles.settingItem, { borderBottomColor: colors.border }]}
+                    onPress={() => openPrompt('name')}
+                >
+                    <Ionicons name="person-outline" size={22} color={colors.textMuted} style={styles.settingIcon} />
+                    <Text style={[styles.settingText, { color: colors.text }]}>Actualizar nombre</Text>
+                    <Ionicons name="chevron-forward" size={20} color={colors.border} style={styles.settingChevron} />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.settingItem} onPress={() => openPrompt('email')}>
-                    <Ionicons name="mail-outline" size={22} color="#444" style={styles.settingIcon} />
-                    <Text style={styles.settingText}>Actualizar correo</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#ccc" style={styles.settingChevron} />
+                <TouchableOpacity
+                    style={[styles.settingItem, { borderBottomColor: colors.border }]}
+                    onPress={() => openPrompt('password')}
+                >
+                    <Ionicons name="key-outline" size={22} color={colors.textMuted} style={styles.settingIcon} />
+                    <Text style={[styles.settingText, { color: colors.text }]}>Cambiar contraseña</Text>
+                    <Ionicons name="chevron-forward" size={20} color={colors.border} style={styles.settingChevron} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.settingItem, { borderBottomColor: colors.border }]}
+                    onPress={() => openPrompt('email')}
+                >
+                    <Ionicons name="mail-outline" size={22} color={colors.textMuted} style={styles.settingIcon} />
+                    <Text style={[styles.settingText, { color: colors.text }]}>Actualizar correo</Text>
+                    <Ionicons name="chevron-forward" size={20} color={colors.border} style={styles.settingChevron} />
                 </TouchableOpacity>
                 <TouchableOpacity 
-                    style={styles.settingItem} 
+                    style={[styles.settingItem, { borderBottomColor: colors.border }]} 
                     onPress={() => navigation.navigate('PrivacyTerms', { type: 'privacy' })}
                 >
-                    <Ionicons name="shield-checkmark-outline" size={22} color="#444" style={styles.settingIcon} />
-                    <Text style={styles.settingText}>Privacidad y Seguridad</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#ccc" style={styles.settingChevron} />
+                    <Ionicons name="shield-checkmark-outline" size={22} color={colors.textMuted} style={styles.settingIcon} />
+                    <Text style={[styles.settingText, { color: colors.text }]}>Privacidad y Seguridad</Text>
+                    <Ionicons name="chevron-forward" size={20} color={colors.border} style={styles.settingChevron} />
                 </TouchableOpacity>
                 <TouchableOpacity 
-                    style={styles.settingItem}
+                    style={[styles.settingItem, { borderBottomColor: colors.border }]}
                     onPress={() => navigation.navigate('PrivacyTerms', { type: 'terms' })}
                 >
-                    <Ionicons name="document-text-outline" size={22} color="#444" style={styles.settingIcon} />
-                    <Text style={styles.settingText}>Términos y Condiciones</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#ccc" style={styles.settingChevron} />
+                    <Ionicons name="document-text-outline" size={22} color={colors.textMuted} style={styles.settingIcon} />
+                    <Text style={[styles.settingText, { color: colors.text }]}>Términos y Condiciones</Text>
+                    <Ionicons name="chevron-forward" size={20} color={colors.border} style={styles.settingChevron} />
                 </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
-                <Ionicons name="log-out-outline" size={20} color="#e74c3c" style={{ marginRight: 8 }} />
-                <Text style={styles.signOutText}>Cerrar Sesión</Text>
+            <TouchableOpacity
+                style={[styles.signOutButton, { backgroundColor: colors.card }]}
+                onPress={signOut}
+            >
+                <Ionicons name="log-out-outline" size={20} color={colors.danger} style={{ marginRight: 8 }} />
+                <Text style={[styles.signOutText, { color: colors.danger }]}>Cerrar Sesión</Text>
             </TouchableOpacity>
             </ScrollView>
 
@@ -303,30 +402,35 @@ export default function PerfilScreen() {
                         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                         style={styles.promptContainer}
                     >
-                        <View style={styles.promptCard}>
+                        <View style={[styles.promptCard, { backgroundColor: colors.card }]}>
                             <View style={styles.promptHeader}>
-                                <Text style={styles.promptTitle}>{promptTitle}</Text>
+                                <Text style={[styles.promptTitle, { color: colors.text }]}>{promptTitle}</Text>
                                 <TouchableOpacity
                                     onPress={closePrompt}
                                     disabled={promptLoading}
-                                    style={styles.promptCloseButton}
+                                    style={[styles.promptCloseButton, { backgroundColor: colors.inputBg }]}
                                 >
-                                    <Ionicons name="close" size={22} color="#333" />
+                                    <Ionicons name="close" size={22} color={colors.text} />
                                 </TouchableOpacity>
                             </View>
 
-                            <Text style={styles.promptHint}>{promptHint}</Text>
+                            <Text style={[styles.promptHint, { color: colors.textMuted }]}>{promptHint}</Text>
 
-                            <View style={styles.promptInputWrapper}>
+                            <View
+                                style={[
+                                    styles.promptInputWrapper,
+                                    { backgroundColor: colors.inputBg, borderColor: colors.inputBorder },
+                                ]}
+                            >
                                 <TextInput
-                                    style={styles.promptInput}
+                                    style={[styles.promptInput, { color: colors.text }]}
                                     placeholder={promptPlaceholder}
-                                    placeholderTextColor="#bbb"
+                                    placeholderTextColor={colors.textMuted}
                                     value={promptValue}
                                     onChangeText={setPromptValue}
-                                    autoCapitalize={promptKind === 'email' || promptKind === 'password' ? 'none' : 'words'}
-                                    autoCorrect={!(promptKind === 'email' || promptKind === 'password')}
-                                    keyboardType={promptKind === 'email' ? 'email-address' : 'default'}
+                                    autoCapitalize={promptKind === 'email' || promptKind === 'password' || promptKind === 'reminderTime' ? 'none' : 'words'}
+                                    autoCorrect={!(promptKind === 'email' || promptKind === 'password' || promptKind === 'reminderTime')}
+                                    keyboardType={promptKind === 'email' ? 'email-address' : promptKind === 'reminderTime' ? 'numeric' : 'default'}
                                     secureTextEntry={promptKind === 'password' && !showPromptValue}
                                     editable={!promptLoading}
                                 />
@@ -339,7 +443,7 @@ export default function PerfilScreen() {
                                         <Ionicons
                                             name={showPromptValue ? 'eye-off-outline' : 'eye-outline'}
                                             size={20}
-                                            color="#888"
+                                            color={colors.textMuted}
                                         />
                                     </TouchableOpacity>
                                 )}
@@ -347,16 +451,17 @@ export default function PerfilScreen() {
 
                             <View style={styles.promptActions}>
                                 <TouchableOpacity
-                                    style={styles.promptCancel}
+                                    style={[styles.promptCancel, { backgroundColor: colors.inputBg }]}
                                     onPress={closePrompt}
                                     disabled={promptLoading}
                                 >
-                                    <Text style={styles.promptCancelText}>Cancelar</Text>
+                                    <Text style={[styles.promptCancelText, { color: colors.text }]}>Cancelar</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[
                                         styles.promptConfirm,
-                                        (promptLoading || !promptValue.trim()) && styles.promptConfirmDisabled,
+                                        { backgroundColor: colors.primary },
+                                        (promptLoading || !promptValue.trim()) && { opacity: 0.6 },
                                     ]}
                                     onPress={handlePromptConfirm}
                                     disabled={promptLoading || !promptValue.trim()}

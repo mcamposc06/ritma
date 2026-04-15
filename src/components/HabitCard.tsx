@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native
 import { Ionicons } from '@expo/vector-icons';
 import { HabitWithCompletion } from '../types';
 import { getShadowStyle } from '../utils/styleHelpers';
+import { useAppTheme } from '../utils/theme';
 
 interface HabitCardProps {
   habit: HabitWithCompletion;
@@ -11,6 +12,7 @@ interface HabitCardProps {
 }
 
 export default function HabitCard({ habit, onToggle, onPressDetails }: HabitCardProps) {
+  const { colors, isDark } = useAppTheme();
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const checkAnim = useRef(new Animated.Value(habit.completed_today ? 1 : 0)).current;
 
@@ -45,25 +47,50 @@ export default function HabitCard({ habit, onToggle, onPressDetails }: HabitCard
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <TouchableOpacity
-        style={[styles.card, habit.completed_today && styles.cardCompleted, { borderLeftColor: habit.color_hex }]}
+        style={[
+          styles.card,
+          {
+            backgroundColor: habit.completed_today ? colors.inputBg : colors.card,
+            borderLeftColor: habit.color_hex,
+          },
+          habit.completed_today && { opacity: 0.8 },
+        ]}
         activeOpacity={0.7}
         onPress={onPressDetails || handleToggle}
       >
         <View style={styles.contentContainer}>
-          <Text style={[styles.title, habit.completed_today && styles.titleCompleted]}>
+          <Text
+            style={[
+              styles.title,
+              { color: colors.text },
+              habit.completed_today && { textDecorationLine: 'line-through', color: colors.textMuted },
+            ]}
+          >
             {habit.title}
           </Text>
 
           <View style={styles.detailsRow}>
             {habit.description ? (
-              <Text style={[styles.description, habit.completed_today && styles.descriptionCompleted]} numberOfLines={1}>
+              <Text
+                style={[
+                  styles.description,
+                  { color: colors.textMuted },
+                  habit.completed_today && { opacity: 0.8 },
+                ]}
+                numberOfLines={1}
+              >
                 {habit.description}
               </Text>
             ) : <View style={{ flex: 1 }} />}
 
             {habit.current_streak !== undefined && habit.current_streak > 0 && (
-              <View style={styles.streakContainer}>
-                <Text style={styles.streakText}>{habit.current_streak} </Text>
+              <View
+                style={[
+                  styles.streakContainer,
+                  { backgroundColor: isDark ? 'rgba(255, 169, 77, 0.18)' : '#fff4e6' },
+                ]}
+              >
+                <Text style={[styles.streakText, { color: colors.warning }]}>{habit.current_streak} </Text>
                 <Text style={styles.streakEmoji}>🔥</Text>
               </View>
             )}
@@ -78,6 +105,7 @@ export default function HabitCard({ habit, onToggle, onPressDetails }: HabitCard
           <Animated.View
             style={[
               styles.checkbox,
+              { borderColor: colors.border },
               habit.completed_today && { backgroundColor: habit.color_hex, borderColor: habit.color_hex },
               { transform: [{ scale: checkAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.3, 1] }) }] }
             ]}

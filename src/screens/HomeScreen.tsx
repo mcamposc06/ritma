@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { getShadowStyle } from '../utils/styleHelpers';
+import { useAppTheme } from '../utils/theme';
 import { useAuthStore } from '../store/useAuthStore';
 import { useHabitStore } from '../store/useHabitStore';
 import HabitCard from '../components/HabitCard';
@@ -38,6 +39,7 @@ export default function HomeScreen() {
     const { user } = useAuthStore();
     const { habitsWithCompletion, isLoading, loadHabitsData, toggleHabitCompletion, error, clearError } = useHabitStore();
     const navigation = useNavigation<HomeScreenNavigationProp>();
+    const { colors } = useAppTheme();
     const progressAnim = useRef(new Animated.Value(0)).current;
     const [showConfetti, setShowConfetti] = useState(false);
     const hasCelebrated = useRef(false);
@@ -113,47 +115,56 @@ export default function HomeScreen() {
 
     return (
         <ScrollView
-            style={styles.safeArea}
+            style={[styles.safeArea, { backgroundColor: colors.background }]}
             contentContainerStyle={styles.container}
             refreshControl={
-                <RefreshControl refreshing={isLoading} onRefresh={loadData} colors={['#3498db']} />
+                <RefreshControl
+                    refreshing={isLoading}
+                    onRefresh={loadData}
+                    colors={[colors.primary]}
+                    tintColor={colors.primary}
+                />
             }
         >
             <View style={styles.header}>
                 <View>
-                    <Text style={styles.greeting}>{greeting},</Text>
-                    <Text style={styles.emailText}>{user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuario'}</Text>
+                    <Text style={[styles.greeting, { color: colors.text }]}>{greeting},</Text>
+                    <Text style={[styles.emailText, { color: colors.textMuted }]}>
+                        {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuario'}
+                    </Text>
                 </View>
             </View>
 
             {/* Progress Summary Card */}
             {totalCount > 0 && (
-                <View style={styles.progressCard}>
+                <View style={[styles.progressCard, { backgroundColor: colors.card }]}>
                     <View style={styles.progressHeader}>
-                        <Text style={styles.progressTitle}>Progreso de Hoy</Text>
-                        <Text style={styles.progressPercent}>{progressPercent}%</Text>
+                        <Text style={[styles.progressTitle, { color: colors.text }]}>Progreso de Hoy</Text>
+                        <Text style={[styles.progressPercent, { color: colors.primary }]}>{progressPercent}%</Text>
                     </View>
-                    <View style={styles.progressBarBg}>
+                    <View style={[styles.progressBarBg, { backgroundColor: colors.inputBorder }]}>
                         <Animated.View
                             style={[
                                 styles.progressBarFill,
-                                { width: progressWidth },
-                                progressPercent === 100 && styles.progressBarComplete,
+                                {
+                                    width: progressWidth,
+                                    backgroundColor: progressPercent === 100 ? colors.success : colors.primary,
+                                },
                             ]}
                         />
                     </View>
-                    <Text style={styles.progressSubtext}>
+                    <Text style={[styles.progressSubtext, { color: colors.textMuted }]}>
                         {completedCount} de {totalCount} hábitos completados
                         {progressPercent === 100 ? ' 🎉' : ''}
                     </Text>
                 </View>
             )}
 
-            <Text style={styles.sectionTitle}>Tus Hábitos de Hoy</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Tus Hábitos de Hoy</Text>
 
             {isLoading && todaysHabits.length === 0 ? (
                 <View style={styles.centerContainer}>
-                    <ActivityIndicator size="large" color="#3498db" />
+                    <ActivityIndicator size="large" color={colors.primary} />
                 </View>
             ) : todaysHabits.length > 0 ? (
                 <View style={styles.habitsList}>
@@ -167,9 +178,11 @@ export default function HomeScreen() {
                     ))}
                 </View>
             ) : (
-                <View style={styles.emptyState}>
-                    <Text style={styles.emptyStateText}>Nada programado para hoy.</Text>
-                    <Text style={styles.emptyStateSubtext}>Tus hábitos para este día aparecerán aquí. ¡Tómate un descanso o crea uno nuevo!</Text>
+                <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Text style={[styles.emptyStateText, { color: colors.text }]}>Nada programado para hoy.</Text>
+                    <Text style={[styles.emptyStateSubtext, { color: colors.textMuted }]}>
+                        Tus hábitos para este día aparecerán aquí. ¡Tómate un descanso o crea uno nuevo!
+                    </Text>
                 </View>
             )}
             

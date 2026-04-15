@@ -18,6 +18,7 @@ interface HabitState {
   createHabit: (title: string, description?: string, frequency?: DayOfWeek[], color_hex?: string) => Promise<void>;
   updateHabit: (habitId: string, updates: Partial<Habit>) => Promise<void>;
   toggleHabitCompletion: (habitId: string, isCompleted: boolean, dateString: string) => Promise<void>;
+  toggleHabitCompletionForDate: (habitId: string, dateString: string) => Promise<void>;
   deleteHabit: (habitId: string) => Promise<void>;
   deleteLog: (dailyLogId: string) => Promise<void>;
   reset: () => void;
@@ -235,6 +236,47 @@ export const useHabitStore = create<HabitState>((set, get) => ({
         });
       }
       // refresh stats after completion toggle
+      await get().loadStats();
+    } catch (error: any) {
+      set({ error: error.message || 'Failed to toggle habit status' });
+    }
+  },
+
+  toggleHabitCompletionForDate: async (habitId: string, dateString: string) => {
+    try {
+      const todayDateString = getLocalDateString();
+      const existingLog = get().allLogs.find(l => l.habit_id === habitId && l.log_date === dateString);
+
+      if (existingLog) {
+        await habitosService.unmarkHabit(existingLog.id);
+
+        const newAllLogs = get().allLogs.filter(l => l.id !== existingLog.id);
+        const newTodayLogs =
+          dateString === todayDateString
+            ? get().todayLogs.filter(l => l.id !== existingLog.id)
+            : get().todayLogs;
+
+        set({
+          todayLogs: newTodayLogs,
+          allLogs: newAllLogs,
+          habitsWithCompletion: calculateHabitsWithCompletion(get().habits, newTodayLogs, newAllLogs, todayDateString)
+        });
+      } else {
+        const newLog = await habitosService.markHabitAsDone(habitId, dateString);
+
+        const newAllLogs = get().allLogs.some(l => l.id === newLog.id) ? get().allLogs : [...get().allLogs, newLog];
+        const newTodayLogs =
+          dateString === todayDateString
+            ? (get().todayLogs.some(l => l.id === newLog.id) ? get().todayLogs : [...get().todayLogs, newLog])
+            : get().todayLogs;
+
+        set({
+          todayLogs: newTodayLogs,
+          allLogs: newAllLogs,
+          habitsWithCompletion: calculateHabitsWithCompletion(get().habits, newTodayLogs, newAllLogs, todayDateString)
+        });
+      }
+
       await get().loadStats();
     } catch (error: any) {
       set({ error: error.message || 'Failed to toggle habit status' });

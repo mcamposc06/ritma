@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, StatusBar, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, StatusBar, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { MainStackParamList } from '../navigation/types';
 import { useHabitStore } from '../store/useHabitStore';
+import { DayOfWeek } from '../types';
 import { getLocalDateString } from '../utils/dateHelpers';
 import { getShadowStyle } from '../utils/styleHelpers';
+import { useAppTheme } from '../utils/theme';
 
 type HabitDetailRouteProp = RouteProp<MainStackParamList, 'HabitDetail'>;
 
@@ -39,8 +41,10 @@ export default function HabitDetailScreen() {
     const navigation = useNavigation();
     const route = useRoute<HabitDetailRouteProp>();
     const { habitId } = route.params;
-    const { habitsWithCompletion, allLogs, isLoading, loadHabitsData } = useHabitStore();
+    const { habitsWithCompletion, allLogs, isLoading, loadHabitsData, toggleHabitCompletionForDate, error, clearError } = useHabitStore();
+    const { colors, isDark } = useAppTheme();
     const didAttemptInitialLoad = useRef(false);
+    const [togglingDateStr, setTogglingDateStr] = useState<string | null>(null);
 
     const habit = useMemo(() => habitsWithCompletion.find(h => h.id === habitId), [habitsWithCompletion, habitId]);
     const habitLogs = useMemo(() => allLogs.filter(l => l.habit_id === habitId), [allLogs, habitId]);
@@ -52,6 +56,13 @@ export default function HabitDetailScreen() {
             loadHabitsData(getLocalDateString());
         }
     }, [habit, habitsWithCompletion.length, isLoading, loadHabitsData]);
+
+    useEffect(() => {
+        if (error) {
+            Alert.alert('Error', error);
+            clearError();
+        }
+    }, [error, clearError]);
 
     // Calendar state
     const [viewDate, setViewDate] = useState(new Date());
@@ -75,21 +86,21 @@ export default function HabitDetailScreen() {
         const shouldShowLoading = isLoading || (!didAttemptInitialLoad.current && habitsWithCompletion.length === 0);
 
         return (
-            <SafeAreaView style={styles.safeArea}>
-                <StatusBar barStyle="dark-content" />
-                <View style={styles.header}>
+            <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+                <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+                <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
                     <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                        <Ionicons name="arrow-back" size={24} color="#333" />
+                        <Ionicons name="arrow-back" size={24} color={colors.text} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle} numberOfLines={1}>Hábito</Text>
+                    <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>Hábito</Text>
                     <View style={{ width: 40 }} />
                 </View>
 
                 <View style={styles.missingContainer}>
                     {shouldShowLoading ? (
-                        <ActivityIndicator size="large" color="#3498db" />
+                        <ActivityIndicator size="large" color={colors.primary} />
                     ) : (
-                        <Text style={styles.missingText}>No se encontró este hábito.</Text>
+                        <Text style={[styles.missingText, { color: colors.textMuted }]}>No se encontró este hábito.</Text>
                     )}
                 </View>
             </SafeAreaView>
@@ -117,125 +128,186 @@ export default function HabitDetailScreen() {
         }
         
         const todayStr = getLocalDateString();
+        const daysMap: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
         
         for (let i = 1; i <= lastDay.getDate(); i++) {
             const d = new Date(year, month, i);
             const dateStr = getLocalDateString(d);
+            const dayOfWeek = daysMap[d.getDay()];
+            const isScheduled = habit.frequency?.includes(dayOfWeek) ?? false;
             const isCompleted = habitLogs.some(l => l.log_date === dateStr);
+
             days.push({
                 date: d,
                 dateStr,
+                dayOfWeek,
+                isScheduled,
+                isFuture: dateStr > todayStr,
                 isCompleted,
-                isToday: dateStr === todayStr
+                isToday: dateStr === todayStr,
             });
         }
         return days;
-    }, [viewDate, habitLogs]);
+    }, [viewDate, habitLogs, habit.frequency]);
 
-    const daysInMonth = useMemo(() => {
-        const year = viewDate.getFullYear();
-        const month = viewDate.getMonth();
-        return new Date(year, month + 1, 0).getDate();
-    }, [viewDate]);
+    const { scheduledDaysInMonth, completedScheduledDaysInMonth } = useMemo(() => {
+        let scheduled = 0;
+        let completed = 0;
 
-    const completionsInMonth = useMemo(() => {
-        const year = viewDate.getFullYear();
-        const month = viewDate.getMonth();
-        return habitLogs.filter(l => {
-            const d = new Date(l.log_date + 'T12:00:00'); // Use midday to avoid TZ shifts
-            return d.getFullYear() === year && d.getMonth() === month;
-        }).length;
-    }, [habitLogs, viewDate]);
+        for (const day of calendarDays) {
+            if (!day) continue;
+            if (!day.isScheduled) continue;
+
+            scheduled++;
+            if (day.isCompleted) completed++;
+        }
+
+        return { scheduledDaysInMonth: scheduled, completedScheduledDaysInMonth: completed };
+    }, [calendarDays]);
 
     const totalCompletions = habitLogs.length;
-    const completionRate = completionsInMonth > 0 ? Math.round((completionsInMonth / daysInMonth) * 100) : 0;
+    const completionRate = scheduledDaysInMonth > 0
+        ? Math.round((completedScheduledDaysInMonth / scheduledDaysInMonth) * 100)
+        : 0;
+
+    const handleToggleCalendarDay = async (dateStr: string) => {
+        if (togglingDateStr) return;
+
+        setTogglingDateStr(dateStr);
+        try {
+            await toggleHabitCompletionForDate(habitId, dateStr);
+        } finally {
+            setTogglingDateStr(null);
+        }
+    };
 
     return (
-        <SafeAreaView style={styles.safeArea}>
-            <StatusBar barStyle="dark-content" />
-            <View style={styles.header}>
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+            <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
                 <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={24} color="#333" />
+                    <Ionicons name="arrow-back" size={24} color={colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle} numberOfLines={1}>{habit.title}</Text>
+                <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{habit.title}</Text>
                 <View style={{ width: 40 }} />
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
                 <View style={styles.contentInner}>
-                    <View style={[styles.card, { borderLeftColor: habit.color_hex }]}>
-                        <Text style={styles.habitTitle}>{habit.title}</Text>
+                    <View style={[styles.card, { borderLeftColor: habit.color_hex, backgroundColor: colors.card }]}>
+                        <Text style={[styles.habitTitle, { color: colors.text }]}>{habit.title}</Text>
                         {habit.description ? (
-                            <Text style={styles.habitDescription}>{habit.description}</Text>
+                            <Text style={[styles.habitDescription, { color: colors.textMuted }]}>{habit.description}</Text>
                         ) : null}
                         
-                        <View style={styles.statsGrid}>
+                        <View style={[styles.statsGrid, { borderTopColor: colors.border }]}>
                             <View style={styles.statContainer}>
-                                <Text style={styles.statValue}>{totalCompletions}</Text>
-                                <Text style={styles.statLabel}>Total</Text>
+                                <Text style={[styles.statValue, { color: colors.text }]}>{totalCompletions}</Text>
+                                <Text style={[styles.statLabel, { color: colors.textMuted }]}>Total</Text>
                             </View>
-                            <View style={styles.divider} />
+                            <View style={[styles.divider, { backgroundColor: colors.border }]} />
                             <View style={styles.statContainer}>
-                                <Text style={styles.statValue}>{habit.current_streak || 0}d</Text>
-                                <Text style={styles.statLabel}>Racha</Text>
+                                <Text style={[styles.statValue, { color: colors.text }]}>{habit.current_streak || 0}d</Text>
+                                <Text style={[styles.statLabel, { color: colors.textMuted }]}>Racha</Text>
                             </View>
-                            <View style={styles.divider} />
+                            <View style={[styles.divider, { backgroundColor: colors.border }]} />
                             <View style={styles.statContainer}>
-                                <Text style={styles.statValue}>{completionRate}%</Text>
-                                <Text style={styles.statLabel}>Mensual</Text>
+                                <Text style={[styles.statValue, { color: colors.text }]}>{completionRate}%</Text>
+                                <Text style={[styles.statLabel, { color: colors.textMuted }]}>Mensual</Text>
                             </View>
                         </View>
                     </View>
 
                     <View style={styles.calendarHeader}>
-                        <Text style={styles.sectionTitle}>{capitalizedMonth} {calendarYear}</Text>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>{capitalizedMonth} {calendarYear}</Text>
                         <View style={styles.calendarNav}>
-                            <TouchableOpacity onPress={goToPreviousMonth} style={styles.navButton}>
-                                <Ionicons name="chevron-back" size={20} color="#3498db" />
+                            <TouchableOpacity
+                                onPress={goToPreviousMonth}
+                                style={[styles.navButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+                            >
+                                <Ionicons name="chevron-back" size={20} color={colors.primary} />
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={goToNextMonth} style={styles.navButton}>
-                                <Ionicons name="chevron-forward" size={20} color="#3498db" />
+                            <TouchableOpacity
+                                onPress={goToNextMonth}
+                                style={[styles.navButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+                            >
+                                <Ionicons name="chevron-forward" size={20} color={colors.primary} />
                             </TouchableOpacity>
                         </View>
                     </View>
 
-                    <View style={styles.calendarContainer}>
+                    <View style={[styles.calendarContainer, { backgroundColor: colors.card }]}>
                         <View style={styles.daysHeader}>
                             {['D', 'L', 'M', 'X', 'J', 'V', 'S'].map(day => (
-                                <Text key={day} style={styles.dayLabel}>{day}</Text>
+                                <Text key={day} style={[styles.dayLabel, { color: colors.textMuted }]}>{day}</Text>
                             ))}
                         </View>
                         <View style={styles.calendarGrid}>
-                            {calendarDays.map((day, index) => (
-                                <View 
-                                    key={day ? day.dateStr : `empty-${index}`} 
-                                    style={[
-                                        styles.calendarCell,
-                                        day?.isCompleted && { backgroundColor: habit.color_hex },
-                                        day?.isToday && styles.todayCell,
-                                        !day && styles.emptyCell
-                                    ]}
-                                >
-                                    {day && (
-                                        <Text style={[
-                                            styles.dayNumber,
-                                            day.isCompleted && { color: '#fff' },
-                                            day.isToday && !day.isCompleted && { color: habit.color_hex }
-                                        ]}>
-                                            {day.date.getDate()}
-                                        </Text>
-                                    )}
-                                </View>
-                            ))}
+                            {calendarDays.map((day, index) => {
+                                if (!day) {
+                                    return (
+                                        <View
+                                            key={`empty-${index}`}
+                                            style={[styles.calendarCell, styles.emptyCell]}
+                                        />
+                                    );
+                                }
+
+                                const isToggling = togglingDateStr === day.dateStr;
+                                const canToggle = !day.isFuture && (day.isScheduled || day.isCompleted) && !isToggling;
+
+                                const backgroundColor = day.isCompleted
+                                    ? habit.color_hex
+                                    : day.isScheduled
+                                        ? colors.inputBg
+                                        : colors.border;
+
+                                return (
+                                    <TouchableOpacity
+                                        key={day.dateStr}
+                                        style={[
+                                            styles.calendarCell,
+                                            { backgroundColor },
+                                            day.isToday && styles.todayCell,
+                                            day.isToday && { borderColor: colors.primary },
+                                            !canToggle && { opacity: 0.5 },
+                                        ]}
+                                        activeOpacity={0.7}
+                                        onPress={() => handleToggleCalendarDay(day.dateStr)}
+                                        disabled={!canToggle}
+                                    >
+                                        {isToggling ? (
+                                            <ActivityIndicator size="small" color={day.isCompleted ? '#fff' : habit.color_hex} />
+                                        ) : (
+                                            <Text
+                                                style={[
+                                                    styles.dayNumber,
+                                                    { color: colors.text },
+                                                    day.isCompleted && { color: '#fff' },
+                                                    day.isToday && !day.isCompleted && { color: habit.color_hex },
+                                                ]}
+                                            >
+                                                {day.date.getDate()}
+                                            </Text>
+                                        )}
+                                    </TouchableOpacity>
+                                );
+                            })}
                         </View>
-                        <View style={styles.legend}>
+                        <View style={[styles.legend, { borderTopColor: colors.border }]}>
                             <View style={styles.legendItem}>
                                 <View style={[styles.legendDot, { backgroundColor: habit.color_hex }]} />
-                                <Text style={styles.legendText}>Completado</Text>
+                                <Text style={[styles.legendText, { color: colors.textMuted }]}>Completado</Text>
                             </View>
                             <View style={styles.legendItem}>
-                                <View style={[styles.legendDot, styles.todayLegendIcon]} />
-                                <Text style={styles.legendText}>Hoy</Text>
+                                <View
+                                    style={[
+                                        styles.legendDot,
+                                        styles.todayLegendIcon,
+                                        { borderColor: colors.primary, backgroundColor: colors.card },
+                                    ]}
+                                />
+                                <Text style={[styles.legendText, { color: colors.textMuted }]}>Hoy</Text>
                             </View>
                         </View>
                     </View>

@@ -10,21 +10,25 @@ import HabitDetailScreen from '../screens/HabitDetailScreen';
 import HabitHistoryScreen from '../screens/HabitHistoryScreen';
 import { Ionicons } from '@expo/vector-icons';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useAppTheme } from '../utils/theme';
 
 // bottom tabs only know about TabParamList
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
 function TabNavigator() {
+    const { colors } = useAppTheme();
+
     return (
         <Tab.Navigator
             screenOptions={({ route }) => ({
                 headerShown: false,
-                tabBarActiveTintColor: '#3498db',
-                tabBarInactiveTintColor: '#8e8e93',
+                tabBarActiveTintColor: colors.primary,
+                tabBarInactiveTintColor: colors.textMuted,
                 tabBarStyle: {
+                    backgroundColor: colors.card,
                     borderTopWidth: 1,
-                    borderTopColor: '#f2f2f2',
+                    borderTopColor: colors.border,
                     elevation: 0,
                     shadowOpacity: 0,
                     height: 60,

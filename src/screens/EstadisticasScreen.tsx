@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppTheme } from '../utils/theme';
 import { useHabitStore } from '../store/useHabitStore';
 import { DayOfWeek } from '../types';
 import { getLocalDateString } from '../utils/dateHelpers';
@@ -10,6 +11,7 @@ const DAYS_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
 export default function EstadisticasScreen() {
     const { habits, allLogs, stats, isLoading, loadHabitsData, loadStats, error, clearError } = useHabitStore();
+    const { colors } = useAppTheme();
 
     const loadData = useCallback(async () => {
         await loadHabitsData(getLocalDateString());
@@ -75,45 +77,50 @@ export default function EstadisticasScreen() {
 
     return (
         <ScrollView
-            style={styles.container}
+            style={[styles.container, { backgroundColor: colors.background }]}
             contentContainerStyle={styles.contentContainer}
             refreshControl={
-                <RefreshControl refreshing={isLoading} onRefresh={loadData} colors={['#3498db']} />
+                <RefreshControl
+                    refreshing={isLoading}
+                    onRefresh={loadData}
+                    colors={[colors.primary]}
+                    tintColor={colors.primary}
+                />
             }
         >
-            <Text style={styles.title}>Estadísticas</Text>
-            <Text style={styles.subtitle}>Tu resumen de actividad semanal.</Text>
+            <Text style={[styles.title, { color: colors.text }]}>Estadísticas</Text>
+            <Text style={[styles.subtitle, { color: colors.textMuted }]}>Tu resumen de actividad semanal.</Text>
 
             {/* Summary Cards */}
             <View style={styles.summaryRow}>
-                <View style={styles.summaryCard}>
-                    <Ionicons name="flame-outline" size={24} color="#e67e22" />
-                    <Text style={styles.summaryValue}>{stats.bestStreak}</Text>
-                    <Text style={styles.summaryLabel}>Mejor Racha</Text>
+                <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
+                    <Ionicons name="flame-outline" size={24} color={colors.warning} />
+                    <Text style={[styles.summaryValue, { color: colors.text }]}>{stats.bestStreak}</Text>
+                    <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Mejor Racha</Text>
                 </View>
-                <View style={styles.summaryCard}>
-                    <Ionicons name="checkmark-done-outline" size={24} color="#2ecc71" />
-                    <Text style={styles.summaryValue}>{weekCompletions}</Text>
-                    <Text style={styles.summaryLabel}>Esta Semana</Text>
+                <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
+                    <Ionicons name="checkmark-done-outline" size={24} color={colors.success} />
+                    <Text style={[styles.summaryValue, { color: colors.text }]}>{weekCompletions}</Text>
+                    <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Esta Semana</Text>
                 </View>
-                <View style={styles.summaryCard}>
-                    <Ionicons name="trending-up-outline" size={24} color="#3498db" />
-                    <Text style={styles.summaryValue}>{stats.weeklyRate}%</Text>
-                    <Text style={styles.summaryLabel}>Cumplimiento</Text>
+                <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
+                    <Ionicons name="trending-up-outline" size={24} color={colors.primary} />
+                    <Text style={[styles.summaryValue, { color: colors.text }]}>{stats.weeklyRate}%</Text>
+                    <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Cumplimiento</Text>
                 </View>
             </View>
 
             {/* Heatmap */}
             {habits.length > 0 ? (
-                <View style={styles.heatmapCard}>
-                    <Text style={styles.heatmapTitle}>Actividad Semanal</Text>
+                <View style={[styles.heatmapCard, { backgroundColor: colors.card }]}>
+                    <Text style={[styles.heatmapTitle, { color: colors.text }]}>Actividad Semanal</Text>
 
                     {/* Day Headers */}
                     <View style={styles.heatmapHeaderRow}>
                         <View style={styles.habitLabelSpace} />
                         {heatmapData.map((day, i) => (
                             <View key={i} style={styles.heatmapDayHeader}>
-                                <Text style={styles.heatmapDayText}>{day.label}</Text>
+                                <Text style={[styles.heatmapDayText, { color: colors.textMuted }]}>{day.label}</Text>
                             </View>
                         ))}
                     </View>
@@ -122,15 +129,17 @@ export default function EstadisticasScreen() {
                     {habits.map(habit => (
                         <View key={habit.id} style={styles.heatmapRow}>
                             <View style={styles.habitLabelSpace}>
-                                <Text style={styles.habitLabel} numberOfLines={1}>{habit.title}</Text>
+                                <Text style={[styles.habitLabel, { color: colors.text }]} numberOfLines={1}>
+                                    {habit.title}
+                                </Text>
                             </View>
                             {heatmapData.map((day, i) => {
                                 const cell = day.habits.find(h => h.id === habit.id);
                                 const bg = !cell?.isScheduled
-                                    ? '#f0f0f0'
+                                    ? colors.inputBg
                                     : cell?.isCompleted
                                         ? habit.color_hex
-                                        : '#e2e8f0';
+                                        : colors.inputBorder;
                                 return (
                                     <View key={i} style={styles.heatmapCellContainer}>
                                         <View style={[styles.heatmapCell, { backgroundColor: bg }]}>
@@ -147,23 +156,23 @@ export default function EstadisticasScreen() {
                     {/* Legend */}
                     <View style={styles.legend}>
                         <View style={styles.legendItem}>
-                            <View style={[styles.legendDot, { backgroundColor: '#f0f0f0' }]} />
-                            <Text style={styles.legendText}>No programado</Text>
+                            <View style={[styles.legendDot, { backgroundColor: colors.inputBg }]} />
+                            <Text style={[styles.legendText, { color: colors.textMuted }]}>No programado</Text>
                         </View>
                         <View style={styles.legendItem}>
-                            <View style={[styles.legendDot, { backgroundColor: '#e2e8f0' }]} />
-                            <Text style={styles.legendText}>Pendiente</Text>
+                            <View style={[styles.legendDot, { backgroundColor: colors.inputBorder }]} />
+                            <Text style={[styles.legendText, { color: colors.textMuted }]}>Pendiente</Text>
                         </View>
                         <View style={styles.legendItem}>
-                            <View style={[styles.legendDot, { backgroundColor: '#2ecc71' }]} />
-                            <Text style={styles.legendText}>Completado</Text>
+                            <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
+                            <Text style={[styles.legendText, { color: colors.textMuted }]}>Completado</Text>
                         </View>
                     </View>
                 </View>
             ) : (
                 <View style={styles.emptyState}>
-                    <Ionicons name="bar-chart-outline" size={48} color="#ccc" style={{ marginBottom: 16 }} />
-                    <Text style={styles.emptyStateText}>Crea hábitos para ver estadísticas</Text>
+                    <Ionicons name="bar-chart-outline" size={48} color={colors.border} style={{ marginBottom: 16 }} />
+                    <Text style={[styles.emptyStateText, { color: colors.textMuted }]}>Crea hábitos para ver estadísticas</Text>
                 </View>
             )}
         </ScrollView>

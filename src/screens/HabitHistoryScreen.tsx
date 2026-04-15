@@ -4,6 +4,7 @@ import { useRoute, RouteProp } from '@react-navigation/native';
 import { MainStackParamList } from '../navigation/types';
 import { useHabitStore } from '../store/useHabitStore';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppTheme } from '../utils/theme';
 
 type HistoryRouteProp = RouteProp<MainStackParamList, 'HabitHistory'>;
 
@@ -11,6 +12,7 @@ export default function HabitHistoryScreen() {
     const route = useRoute<HistoryRouteProp>();
     const { habitId, title } = route.params;
     const { allLogs, deleteLog, isLoading, error, clearError } = useHabitStore();
+    const { colors } = useAppTheme();
     const [removingId, setRemovingId] = useState<string | null>(null);
 
     // watch for errors and show alert
@@ -43,25 +45,25 @@ export default function HabitHistoryScreen() {
     }, [deleteLog]);
 
     const renderItem = ({ item }: { item: { id: string; log_date: string } }) => (
-        <View style={styles.row}>
-            <Text style={styles.dateText}>{item.log_date}</Text>
+        <View style={[styles.row, { backgroundColor: colors.card }]}>
+            <Text style={[styles.dateText, { color: colors.text }]}>{item.log_date}</Text>
             <TouchableOpacity onPress={() => handleRemove(item.id)} disabled={removingId === item.id}>
                 {removingId === item.id ? (
-                    <ActivityIndicator size="small" color="#e74c3c" />
+                    <ActivityIndicator size="small" color={colors.danger} />
                 ) : (
-                    <Ionicons name="trash-outline" size={20} color="#e74c3c" />
+                    <Ionicons name="trash-outline" size={20} color={colors.danger} />
                 )}
             </TouchableOpacity>
         </View>
     );
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>{title}</Text>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+            <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
 
             {habitLogs.length === 0 ? (
                 <View style={styles.emptyState}>
-                    <Text style={styles.emptyText}>No hay registros de este hábito.</Text>
+                    <Text style={[styles.emptyText, { color: colors.textMuted }]}>No hay registros de este hábito.</Text>
                 </View>
             ) : (
                 <FlatList

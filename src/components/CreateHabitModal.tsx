@@ -15,6 +15,7 @@ import {
   ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppTheme } from '../utils/theme';
 import { useHabitStore } from '../store/useHabitStore';
 import { DayOfWeek, Habit } from '../types';
 
@@ -38,6 +39,7 @@ const DAYS: { key: DayOfWeek; label: string }[] = [
 
 export default function CreateHabitModal({ visible, onClose, initialHabit }: CreateHabitModalProps) {
   const { createHabit, updateHabit } = useHabitStore();
+  const { colors } = useAppTheme();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [colorHex, setColorHex] = useState(COLORS[0]);
@@ -122,12 +124,12 @@ export default function CreateHabitModal({ visible, onClose, initialHabit }: Cre
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.modalContent}
+          style={[styles.modalContent, { backgroundColor: colors.card }]}
         >
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>{isEditing ? 'Editar Hábito' : 'Nuevo Hábito'}</Text>
-            <TouchableOpacity onPress={resetAndClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="#333" />
+            <Text style={[styles.headerTitle, { color: colors.text }]}>{isEditing ? 'Editar Hábito' : 'Nuevo Hábito'}</Text>
+            <TouchableOpacity onPress={resetAndClose} style={[styles.closeButton, { backgroundColor: colors.inputBg }]}>
+              <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
 
@@ -136,16 +138,20 @@ export default function CreateHabitModal({ visible, onClose, initialHabit }: Cre
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            <Text style={styles.label}>Título del Hábito</Text>
+            <Text style={[styles.label, { color: colors.textMuted }]}>Título del Hábito</Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text },
+              ]}
               placeholder="Ej. Beber agua, Leer 20 páginas..."
+              placeholderTextColor={colors.textMuted}
               value={title}
               onChangeText={setTitle}
               autoFocus={!isEditing}
             />
 
-            <Text style={styles.label}>Días de la semana</Text>
+            <Text style={[styles.label, { color: colors.textMuted }]}>Días de la semana</Text>
             <View style={styles.daysSelector}>
               {DAYS.map(day => {
                 const isSelected = selectedDays.includes(day.key);
@@ -154,12 +160,14 @@ export default function CreateHabitModal({ visible, onClose, initialHabit }: Cre
                     key={day.key}
                     style={[
                       styles.dayCircle,
+                      { backgroundColor: colors.inputBg, borderColor: colors.inputBorder },
                       isSelected && { backgroundColor: colorHex, borderColor: colorHex }
                     ]}
                     onPress={() => toggleDay(day.key)}
                   >
                     <Text style={[
                       styles.dayText,
+                      { color: colors.textMuted },
                       isSelected && styles.dayTextSelected
                     ]}>
                       {day.label}
@@ -169,17 +177,22 @@ export default function CreateHabitModal({ visible, onClose, initialHabit }: Cre
               })}
             </View>
 
-            <Text style={styles.label}>Descripción (Opcional)</Text>
+            <Text style={[styles.label, { color: colors.textMuted }]}>Descripción (Opcional)</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
+              style={[
+                styles.input,
+                styles.textArea,
+                { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text },
+              ]}
               placeholder="Agrega notas o detalles..."
+              placeholderTextColor={colors.textMuted}
               value={description}
               onChangeText={setDescription}
               multiline
               numberOfLines={3}
             />
 
-            <Text style={styles.label}>Color</Text>
+            <Text style={[styles.label, { color: colors.textMuted }]}>Color</Text>
             <View style={styles.colorSelector}>
               {COLORS.map(color => (
                 <TouchableOpacity

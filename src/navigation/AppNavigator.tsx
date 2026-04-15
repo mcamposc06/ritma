@@ -6,11 +6,13 @@ import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
 import { useAuthStore } from '../store/useAuthStore';
 import { RootStackParamList } from './types';
+import { useAppTheme } from '../utils/theme';
 
 const prefix = Linking.createURL('/');
 
 export default function AppNavigator() {
     const { session, isInitialized, initialize } = useAuthStore();
+    const { navigationTheme, colors } = useAppTheme();
 
     useEffect(() => {
         initialize();
@@ -18,8 +20,8 @@ export default function AppNavigator() {
 
     if (!isInitialized) {
         return (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator size="large" color="#3498db" />
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+                <ActivityIndicator size="large" color={colors.primary} />
             </View>
         );
     }
@@ -54,7 +56,7 @@ export default function AppNavigator() {
     };
 
     return (
-        <NavigationContainer linking={linking}>
+        <NavigationContainer linking={linking} theme={navigationTheme}>
             {session ? <MainNavigator /> : <AuthNavigator />}
         </NavigationContainer>
     );

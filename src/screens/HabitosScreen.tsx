@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppTheme } from '../utils/theme';
 import { useHabitStore } from '../store/useHabitStore';
 import CreateHabitModal from '../components/CreateHabitModal';
 import { Habit } from '../types';
@@ -19,6 +20,7 @@ type HabitosScreenNavigationProp = CompositeNavigationProp<
 
 export default function HabitosScreen() {
     const { habits, isLoading, loadHabitsData, deleteHabit, error, clearError } = useHabitStore();
+    const { colors } = useAppTheme();
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [habitToEdit, setHabitToEdit] = useState<Habit | null>(null);
     const navigation = useNavigation<HabitosScreenNavigationProp>();
@@ -79,18 +81,22 @@ export default function HabitosScreen() {
     };
 
     const renderItem = ({ item }: { item: Habit }) => (
-        <View style={[styles.habitItem, { borderLeftColor: item.color_hex }]}>
+        <View style={[styles.habitItem, { borderLeftColor: item.color_hex, backgroundColor: colors.card }]}>
             <TouchableOpacity 
                 style={styles.habitInfo}
                 onPress={() => navigation.navigate('HabitDetail', { habitId: item.id })}
                 activeOpacity={0.7}
             >
-                <Text style={styles.habitTitle}>{item.title}</Text>
+                <Text style={[styles.habitTitle, { color: colors.text }]}>{item.title}</Text>
                 {item.description ? (
-                    <Text style={styles.habitDescription} numberOfLines={2}>{item.description}</Text>
+                    <Text style={[styles.habitDescription, { color: colors.textMuted }]} numberOfLines={2}>
+                        {item.description}
+                    </Text>
                 ) : null}
-                <View style={styles.frequencyBadge}>
-                    <Text style={styles.frequencyText}>{item.frequency?.length || 7} días/semana</Text>
+                <View style={[styles.frequencyBadge, { backgroundColor: colors.inputBg }]}>
+                    <Text style={[styles.frequencyText, { color: colors.textMuted }]}>
+                        {item.frequency?.length || 7} días/semana
+                    </Text>
                 </View>
             </TouchableOpacity>
             
@@ -99,28 +105,28 @@ export default function HabitosScreen() {
                     style={styles.actionButton}
                     onPress={() => navigation.navigate('HabitHistory', { habitId: item.id, title: item.title })}
                 >
-                    <Ionicons name="calendar-outline" size={20} color="#9b59b6" />
+                    <Ionicons name="calendar-outline" size={20} color={colors.warning} />
                 </TouchableOpacity>
                 <TouchableOpacity 
                     style={styles.actionButton}
                     onPress={() => handleEdit(item)}
                 >
-                    <Ionicons name="pencil-outline" size={20} color="#3498db" />
+                    <Ionicons name="pencil-outline" size={20} color={colors.primary} />
                 </TouchableOpacity>
                 <TouchableOpacity 
                     style={styles.actionButton}
                     onPress={() => confirmDelete(item.id)}
                 >
-                    <Ionicons name="trash-outline" size={20} color="#e74c3c" />
+                    <Ionicons name="trash-outline" size={20} color={colors.danger} />
                 </TouchableOpacity>
             </View>
         </View>
     );
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>Mis Hábitos</Text>
-            <Text style={styles.subtitle}>Aquí gestionarás todos tus hábitos.</Text>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+            <Text style={[styles.title, { color: colors.text }]}>Mis Hábitos</Text>
+            <Text style={[styles.subtitle, { color: colors.textMuted }]}>Aquí gestionarás todos tus hábitos.</Text>
 
             <FlatList
                 data={habits}
@@ -129,21 +135,28 @@ export default function HabitosScreen() {
                 contentContainerStyle={styles.listContainer}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
-                    <RefreshControl refreshing={isLoading} onRefresh={loadData} colors={['#3498db']} />
+                    <RefreshControl
+                        refreshing={isLoading}
+                        onRefresh={loadData}
+                        colors={[colors.primary]}
+                        tintColor={colors.primary}
+                    />
                 }
                 ListEmptyComponent={
                     !isLoading ? (
                         <View style={styles.emptyState}>
-                            <Ionicons name="leaf-outline" size={48} color="#ccc" style={{marginBottom: 16}}/>
-                            <Text style={styles.emptyStateText}>No tienes hábitos creados.</Text>
-                            <Text style={styles.emptyStateSubtext}>Usa el botón '+' para agregar el primero.</Text>
+                            <Ionicons name="leaf-outline" size={48} color={colors.border} style={{ marginBottom: 16 }} />
+                            <Text style={[styles.emptyStateText, { color: colors.text }]}>No tienes hábitos creados.</Text>
+                            <Text style={[styles.emptyStateSubtext, { color: colors.textMuted }]}>
+                                Usa el botón '+' para agregar el primero.
+                            </Text>
                         </View>
                     ) : null
                 }
             />
 
             <TouchableOpacity 
-                style={styles.fab}
+                style={[styles.fab, { backgroundColor: colors.primary, shadowColor: colors.primary }]}
                 onPress={handleCreateNew}
             >
                 <Ionicons name="add" size={28} color="#fff" />
