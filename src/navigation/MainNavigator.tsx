@@ -31,9 +31,9 @@ function TabNavigator() {
                     borderTopColor: colors.border,
                     elevation: 0,
                     shadowOpacity: 0,
-                    height: 60,
-                    paddingBottom: 8,
-                    paddingTop: 8,
+                    height: 70, // Incrementamos la altura para evitar recortes
+                    paddingBottom: 10, // Aseguramos suficiente espacio inferior
+                    paddingTop: 10, // Aseguramos suficiente espacio superior
                 },
                 tabBarIcon: ({ focused, color, size }) => {
                     let iconName: keyof typeof Ionicons.glyphMap;

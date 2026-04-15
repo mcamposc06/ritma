@@ -54,7 +54,7 @@ export default function RegisterScreen() {
             }
         } else {
             console.log('Registro exitoso:', data.user?.id);
-            Alert.alert(
+          Alert.alert(
                 '¡Éxito!',
                 'Cuenta creada. Si tu instancia requiere confirmación por correo, revisa tu email antes de iniciar sesión.'
             );
