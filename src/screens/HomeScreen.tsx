@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Animated, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Animated, Alert, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import ConfettiCannon from 'react-native-confetti-cannon';
@@ -183,6 +183,15 @@ export default function HomeScreen() {
                     <Text style={[styles.emptyStateSubtext, { color: colors.textMuted }]}>
                         Tus hábitos para este día aparecerán aquí. ¡Tómate un descanso o crea uno nuevo!
                     </Text>
+
+                    <TouchableOpacity
+                        style={[styles.emptyCtaButton, { backgroundColor: colors.primary }]}
+                        onPress={() => navigation.navigate('Habitos')}
+                        activeOpacity={0.85}
+                    >
+                        <Ionicons name="add-circle-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
+                        <Text style={styles.emptyCtaText}>Crear hábito</Text>
+                    </TouchableOpacity>
                 </View>
             )}
             
@@ -302,5 +311,20 @@ const styles = StyleSheet.create({
         color: '#888',
         textAlign: 'center',
         lineHeight: 20,
+    },
+    emptyCtaButton: {
+        marginTop: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 18,
+        borderRadius: 12,
+        minWidth: 200,
+    },
+    emptyCtaText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '700',
     }
 });
