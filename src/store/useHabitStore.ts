@@ -127,6 +127,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       set({ stats: { ...baseStats, bestStreak, weeklyRate } });
     } catch (error: any) {
       console.error("Failed to load stats", error);
+      set({ error: error?.message || 'No se pudieron cargar las estadísticas' });
     }
   },
 

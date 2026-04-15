@@ -14,6 +14,15 @@ Notifications.setNotificationHandler({
 });
 
 export const notificationsService = {
+  async ensureAndroidChannel(): Promise<void> {
+    if (Platform.OS !== 'android') return;
+
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.DEFAULT,
+    });
+  },
+
   // Request permissions for notifications
   async requestPermissions(): Promise<boolean> {
     if (Platform.OS === 'web') return false;
@@ -34,6 +43,8 @@ export const notificationsService = {
     if (Platform.OS === 'web') return;
     await this.cancelAllReminders(); // Clear existing to avoid duplicates
 
+    await this.ensureAndroidChannel();
+
     await Notifications.scheduleNotificationAsync({
       content: {
         title: "¡Hola! ¿Completaste tus hábitos de hoy?",
@@ -50,6 +61,7 @@ export const notificationsService = {
 
   // Cancel all scheduled notifications
   async cancelAllReminders(): Promise<void> {
+    if (Platform.OS === 'web') return;
     await Notifications.cancelAllScheduledNotificationsAsync();
   }
 };

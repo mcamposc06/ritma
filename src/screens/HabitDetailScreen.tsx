@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, StatusBar, Dimensions } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, StatusBar, Dimensions, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { MainStackParamList } from '../navigation/types';
@@ -15,6 +15,21 @@ const COLUMN_COUNT = 7;
 const CALENDAR_GAP = 8;
 const CONTENT_PADDING = 24;
 
+const MONTHS_ES = [
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre',
+];
+
 // Calculate cell size but cap it to avoid huge circles on web
 const availableWidth = Math.min(windowWidth, MAX_CONTENT_WIDTH) - (CONTENT_PADDING * 2) - 40; // 40 for container padding
 const CELL_SIZE = Math.min(42, (availableWidth - (COLUMN_COUNT - 1) * CALENDAR_GAP) / COLUMN_COUNT);
@@ -24,10 +39,19 @@ export default function HabitDetailScreen() {
     const navigation = useNavigation();
     const route = useRoute<HabitDetailRouteProp>();
     const { habitId } = route.params;
-    const { habitsWithCompletion, allLogs } = useHabitStore();
+    const { habitsWithCompletion, allLogs, isLoading, loadHabitsData } = useHabitStore();
+    const didAttemptInitialLoad = useRef(false);
 
     const habit = useMemo(() => habitsWithCompletion.find(h => h.id === habitId), [habitsWithCompletion, habitId]);
     const habitLogs = useMemo(() => allLogs.filter(l => l.habit_id === habitId), [allLogs, habitId]);
+
+    useEffect(() => {
+        // If user navigates here before data is loaded (or via deep link), try loading once.
+        if (!habit && habitsWithCompletion.length === 0 && !isLoading && !didAttemptInitialLoad.current) {
+            didAttemptInitialLoad.current = true;
+            loadHabitsData(getLocalDateString());
+        }
+    }, [habit, habitsWithCompletion.length, isLoading, loadHabitsData]);
 
     // Calendar state
     const [viewDate, setViewDate] = useState(new Date());
@@ -44,11 +68,33 @@ export default function HabitDetailScreen() {
         setViewDate(d);
     };
 
-    const monthName = viewDate.toLocaleString('es-ES', { month: 'long' });
-    const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+    const capitalizedMonth = MONTHS_ES[viewDate.getMonth()] || '';
     const calendarYear = viewDate.getFullYear();
 
-    if (!habit) return null;
+    if (!habit) {
+        const shouldShowLoading = isLoading || (!didAttemptInitialLoad.current && habitsWithCompletion.length === 0);
+
+        return (
+            <SafeAreaView style={styles.safeArea}>
+                <StatusBar barStyle="dark-content" />
+                <View style={styles.header}>
+                    <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+                        <Ionicons name="arrow-back" size={24} color="#333" />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle} numberOfLines={1}>Hábito</Text>
+                    <View style={{ width: 40 }} />
+                </View>
+
+                <View style={styles.missingContainer}>
+                    {shouldShowLoading ? (
+                        <ActivityIndicator size="large" color="#3498db" />
+                    ) : (
+                        <Text style={styles.missingText}>No se encontró este hábito.</Text>
+                    )}
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     // Generate days for the current month view
     const calendarDays = useMemo(() => {
@@ -222,6 +268,17 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#1a1a2e',
         maxWidth: windowWidth * 0.6,
+    },
+    missingContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+    },
+    missingText: {
+        fontSize: 16,
+        color: '#666',
+        textAlign: 'center',
     },
     content: {
         padding: CONTENT_PADDING,

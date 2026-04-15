@@ -1,5 +1,19 @@
 import React, { useEffect, useCallback, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, Switch, Alert } from 'react-native';
+import {
+    View,
+    Text,
+    StyleSheet,
+    TouchableOpacity,
+    ScrollView,
+    RefreshControl,
+    Switch,
+    Alert,
+    Modal,
+    TextInput,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../store/useAuthStore';
@@ -19,11 +33,18 @@ type PerfilScreenNavigationProp = CompositeNavigationProp<
     NativeStackNavigationProp<MainStackParamList>
 >;
 
+type ProfilePromptKind = 'name' | 'password' | 'email';
+
 export default function PerfilScreen() {
     const { user, signOut } = useAuthStore();
     const { stats, loadStats, loadHabitsData, error, clearError } = useHabitStore();
     const [refreshing, setRefreshing] = useState(false);
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+    const [promptVisible, setPromptVisible] = useState(false);
+    const [promptKind, setPromptKind] = useState<ProfilePromptKind | null>(null);
+    const [promptValue, setPromptValue] = useState('');
+    const [promptLoading, setPromptLoading] = useState(false);
+    const [showPromptValue, setShowPromptValue] = useState(false);
     const navigation = useNavigation<PerfilScreenNavigationProp>();
 
     const onRefresh = useCallback(async () => {
@@ -70,14 +91,121 @@ export default function PerfilScreen() {
         }
     };
 
-    return (
-        <ScrollView
-            style={styles.container}
-            contentContainerStyle={styles.contentContainer}
-            refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3498db']} />
+    const openPrompt = (kind: ProfilePromptKind) => {
+        if (!user) {
+            Alert.alert('Error', 'Sesión no válida.');
+            return;
+        }
+
+        setPromptKind(kind);
+        setShowPromptValue(false);
+
+        if (kind === 'name') {
+            setPromptValue((user.user_metadata?.full_name as string | undefined) || '');
+        } else if (kind === 'email') {
+            setPromptValue(user.email || '');
+        } else {
+            setPromptValue('');
+        }
+
+        setPromptVisible(true);
+    };
+
+    const forceClosePrompt = () => {
+        setPromptVisible(false);
+        setPromptKind(null);
+        setPromptValue('');
+        setShowPromptValue(false);
+    };
+
+    const closePrompt = () => {
+        if (promptLoading) return;
+        forceClosePrompt();
+    };
+
+    const promptTitle =
+        promptKind === 'name'
+            ? 'Actualizar nombre'
+            : promptKind === 'password'
+                ? 'Cambiar contraseña'
+                : 'Actualizar correo';
+
+    const promptHint =
+        promptKind === 'name'
+            ? 'Ingresa tu nombre completo'
+            : promptKind === 'password'
+                ? 'Mínimo 6 caracteres'
+                : 'Ingresa tu nuevo correo electrónico';
+
+    const promptPlaceholder =
+        promptKind === 'name'
+            ? 'Ej: Juan Pérez'
+            : promptKind === 'password'
+                ? 'Nueva contraseña'
+                : 'nuevo@correo.com';
+
+    const handlePromptConfirm = async () => {
+        if (!promptKind) return;
+        const kind = promptKind;
+        if (!user) {
+            Alert.alert('Error', 'Sesión no válida.');
+            return;
+        }
+
+        const rawValue = kind === 'password' ? promptValue : promptValue.trim();
+
+        if (kind === 'name') {
+            if (!rawValue) return Alert.alert('Error', 'Ingresa tu nombre.');
+        }
+
+        if (kind === 'email') {
+            if (!rawValue) return Alert.alert('Error', 'Ingresa tu correo.');
+            if (!rawValue.includes('@')) return Alert.alert('Error', 'Ingresa un correo válido.');
+        }
+
+        if (kind === 'password') {
+            if (!rawValue || rawValue.length < 6) {
+                return Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres.');
             }
-        >
+        }
+
+        setPromptLoading(true);
+        try {
+            const updates =
+                kind === 'name'
+                    ? { data: { full_name: rawValue } }
+                    : kind === 'email'
+                        ? { email: rawValue }
+                        : { password: rawValue };
+
+            const { error } = await supabase.auth.updateUser(updates);
+            if (error) throw error;
+
+            forceClosePrompt();
+
+            if (kind === 'email') {
+                Alert.alert('¡Listo!', 'Revisa tu nuevo correo para confirmar el cambio (si aplica).');
+            } else if (kind === 'name') {
+                Alert.alert('¡Listo!', 'Nombre actualizado.');
+            } else {
+                Alert.alert('¡Listo!', 'Contraseña actualizada.');
+            }
+        } catch (e: any) {
+            Alert.alert('Error', e?.message || 'No se pudo actualizar.');
+        } finally {
+            setPromptLoading(false);
+        }
+    };
+
+    return (
+        <View style={{ flex: 1 }}>
+            <ScrollView
+                style={styles.container}
+                contentContainerStyle={styles.contentContainer}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3498db']} />
+                }
+            >
             <View style={styles.header}>
                 <View style={styles.avatarPlaceholder}>
                     <Text style={styles.avatarText}>{user?.email?.charAt(0).toUpperCase()}</Text>
@@ -119,81 +247,17 @@ export default function PerfilScreen() {
                         value={notificationsEnabled}
                     />
                 </View>
-                <TouchableOpacity style={styles.settingItem} onPress={async () => {
-                    if (Alert.prompt) {
-                        Alert.prompt(
-                            'Actualizar nombre',
-                            'Ingresa tu nombre completo',
-                            async (newName: string) => {
-                                if (!newName) return;
-                                try {
-                                    const { error } = await supabase.auth.updateUser({ 
-                                        data: { full_name: newName.trim() } 
-                                    });
-                                    if (error) throw error;
-                                    Alert.alert('¡Listo!', 'Nombre actualizado. Los cambios se verán al reiniciar o recargar.');
-                                } catch (e: any) {
-                                    Alert.alert('Error', e.message || 'No se pudo actualizar el nombre');
-                                }
-                            },
-                            'plain-text',
-                            user?.user_metadata?.full_name || ''
-                        );
-                    } else {
-                        Alert.alert('Función no disponible', 'Actualiza tu nombre desde la configuración de tu cuenta.');
-                    }
-                }}>
+                <TouchableOpacity style={styles.settingItem} onPress={() => openPrompt('name')}>
                     <Ionicons name="person-outline" size={22} color="#444" style={styles.settingIcon} />
                     <Text style={styles.settingText}>Actualizar nombre</Text>
                     <Ionicons name="chevron-forward" size={20} color="#ccc" style={styles.settingChevron} />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.settingItem} onPress={async () => {
-                    if (Alert.prompt) {
-                        Alert.prompt(
-                            'Cambiar contraseña',
-                            'Ingresa tu nueva contraseña (min 6 caracteres)',
-                            async (pwd: string) => {
-                                if (!pwd || pwd.length < 6) return Alert.alert('Error','La contraseña debe tener al menos 6 caracteres');
-                                try {
-                                    const { error } = await supabase.auth.updateUser({ password: pwd });
-                                    if (error) throw error;
-                                    Alert.alert('¡Listo!', 'Contraseña actualizada.');
-                                } catch (e: any) {
-                                    Alert.alert('Error', e.message || 'No se pudo cambiar contraseña');
-                                }
-                            },
-                            'secure-text'
-                        );
-                    } else {
-                        Alert.alert('Función no disponible', 'Actualiza tu contraseña desde la web o en un dispositivo que soporte prompts.');
-                    }
-                }}>
+                <TouchableOpacity style={styles.settingItem} onPress={() => openPrompt('password')}>
                     <Ionicons name="key-outline" size={22} color="#444" style={styles.settingIcon} />
                     <Text style={styles.settingText}>Cambiar contraseña</Text>
                     <Ionicons name="chevron-forward" size={20} color="#ccc" style={styles.settingChevron} />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.settingItem} onPress={async () => {
-                    if (Alert.prompt) {
-                        Alert.prompt(
-                            'Actualizar correo',
-                            'Ingresa tu nuevo correo electrónico',
-                            async (newEmail: string) => {
-                                if (!newEmail) return;
-                                try {
-                                    const { error } = await supabase.auth.updateUser({ email: newEmail });
-                                    if (error) throw error;
-                                    Alert.alert('¡Listo!', 'Correo actualizado.');
-                                } catch (e: any) {
-                                    Alert.alert('Error', e.message || 'No se pudo actualizar correo');
-                                }
-                            },
-                            'plain-text',
-                            user?.email || ''
-                        );
-                    } else {
-                        Alert.alert('Función no disponible', 'Actualiza tu correo desde la web o en un dispositivo que soporte prompts.');
-                    }
-                }}>
+                <TouchableOpacity style={styles.settingItem} onPress={() => openPrompt('email')}>
                     <Ionicons name="mail-outline" size={22} color="#444" style={styles.settingIcon} />
                     <Text style={styles.settingText}>Actualizar correo</Text>
                     <Ionicons name="chevron-forward" size={20} color="#ccc" style={styles.settingChevron} />
@@ -220,7 +284,95 @@ export default function PerfilScreen() {
                 <Ionicons name="log-out-outline" size={20} color="#e74c3c" style={{ marginRight: 8 }} />
                 <Text style={styles.signOutText}>Cerrar Sesión</Text>
             </TouchableOpacity>
-        </ScrollView>
+            </ScrollView>
+
+            <Modal
+                visible={promptVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={closePrompt}
+            >
+                <View style={styles.promptOverlay}>
+                    <TouchableOpacity
+                        style={styles.promptBackdrop}
+                        activeOpacity={1}
+                        onPress={closePrompt}
+                    />
+
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                        style={styles.promptContainer}
+                    >
+                        <View style={styles.promptCard}>
+                            <View style={styles.promptHeader}>
+                                <Text style={styles.promptTitle}>{promptTitle}</Text>
+                                <TouchableOpacity
+                                    onPress={closePrompt}
+                                    disabled={promptLoading}
+                                    style={styles.promptCloseButton}
+                                >
+                                    <Ionicons name="close" size={22} color="#333" />
+                                </TouchableOpacity>
+                            </View>
+
+                            <Text style={styles.promptHint}>{promptHint}</Text>
+
+                            <View style={styles.promptInputWrapper}>
+                                <TextInput
+                                    style={styles.promptInput}
+                                    placeholder={promptPlaceholder}
+                                    placeholderTextColor="#bbb"
+                                    value={promptValue}
+                                    onChangeText={setPromptValue}
+                                    autoCapitalize={promptKind === 'email' || promptKind === 'password' ? 'none' : 'words'}
+                                    autoCorrect={!(promptKind === 'email' || promptKind === 'password')}
+                                    keyboardType={promptKind === 'email' ? 'email-address' : 'default'}
+                                    secureTextEntry={promptKind === 'password' && !showPromptValue}
+                                    editable={!promptLoading}
+                                />
+                                {promptKind === 'password' && (
+                                    <TouchableOpacity
+                                        style={styles.promptEyeButton}
+                                        onPress={() => setShowPromptValue(v => !v)}
+                                        disabled={promptLoading}
+                                    >
+                                        <Ionicons
+                                            name={showPromptValue ? 'eye-off-outline' : 'eye-outline'}
+                                            size={20}
+                                            color="#888"
+                                        />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+
+                            <View style={styles.promptActions}>
+                                <TouchableOpacity
+                                    style={styles.promptCancel}
+                                    onPress={closePrompt}
+                                    disabled={promptLoading}
+                                >
+                                    <Text style={styles.promptCancelText}>Cancelar</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.promptConfirm,
+                                        (promptLoading || !promptValue.trim()) && styles.promptConfirmDisabled,
+                                    ]}
+                                    onPress={handlePromptConfirm}
+                                    disabled={promptLoading || !promptValue.trim()}
+                                >
+                                    {promptLoading ? (
+                                        <ActivityIndicator color="#fff" />
+                                    ) : (
+                                        <Text style={styles.promptConfirmText}>Guardar</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </KeyboardAvoidingView>
+                </View>
+            </Modal>
+        </View>
     );
 }
 
@@ -335,5 +487,100 @@ const styles = StyleSheet.create({
         color: '#e74c3c',
         fontSize: 16,
         fontWeight: '600',
-    }
+    },
+    promptOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        justifyContent: 'center',
+        padding: 24,
+    },
+    promptBackdrop: {
+        ...StyleSheet.absoluteFillObject,
+    },
+    promptContainer: {
+        width: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    promptCard: {
+        width: '100%',
+        maxWidth: 520,
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 18,
+        ...getShadowStyle('#000', 0, 10, 0.1, 18, 6),
+    },
+    promptHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    promptTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: '#1a1a2e',
+    },
+    promptCloseButton: {
+        padding: 6,
+        borderRadius: 16,
+        backgroundColor: '#f0f0f0',
+    },
+    promptHint: {
+        fontSize: 13,
+        color: '#666',
+        marginBottom: 12,
+    },
+    promptInputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f8fafc',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+    },
+    promptInput: {
+        flex: 1,
+        paddingVertical: 14,
+        fontSize: 16,
+        color: '#333',
+    },
+    promptEyeButton: {
+        padding: 8,
+    },
+    promptActions: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        gap: 10,
+        marginTop: 16,
+    },
+    promptCancel: {
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        borderRadius: 10,
+        backgroundColor: '#f0f4f8',
+    },
+    promptCancelText: {
+        color: '#333',
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    promptConfirm: {
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        borderRadius: 10,
+        backgroundColor: '#3498db',
+        minWidth: 110,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    promptConfirmDisabled: {
+        backgroundColor: '#95c6e8',
+    },
+    promptConfirmText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '800',
+    },
 });
