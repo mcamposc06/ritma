@@ -4,6 +4,8 @@ import {
     Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
     SafeAreaView, StatusBar
 } from 'react-native';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '../services/supabase';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../navigation/types';
@@ -13,39 +15,116 @@ import { getShadowStyle } from '../utils/styleHelpers';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
+WebBrowser.maybeCompleteAuthSession();
+
 export default function LoginScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [loadingProvider, setLoadingProvider] = useState<'password' | 'google' | null>(null);
     const [showPassword, setShowPassword] = useState(false);
     const navigation = useNavigation<LoginScreenNavigationProp>();
 
+    const isPasswordLoading = loadingProvider === 'password';
+    const isGoogleLoading = loadingProvider === 'google';
+    const isBusy = loadingProvider !== null;
+
     const handleLogin = async () => {
         if (!email || !password) return Alert.alert('Error', 'Por favor completa todos los campos.');
-        setLoading(true);
-        console.log('Intentando inicio de sesión para:', email);
-        
-        const { data, error } = await supabase.auth.signInWithPassword({ 
-            email: email.trim(), 
-            password 
-        });
+        setLoadingProvider('password');
+        try {
+            console.log('Intentando inicio de sesión para:', email);
 
-        if (error) {
-            console.error('Error de inicio de sesión (Supabase):', {
-                message: error.message,
-                status: error.status,
-                name: error.name
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: email.trim(),
+                password
             });
-            
-            if (error.message.includes('Invalid login credentials')) {
-                Alert.alert('Error', 'Correo o contraseña incorrectos. Por favor, verifica tus datos.');
+
+            if (error) {
+                console.error('Error de inicio de sesión (Supabase):', {
+                    message: error.message,
+                    status: error.status,
+                    name: error.name
+                });
+
+                if (error.message.includes('Invalid login credentials')) {
+                    Alert.alert('Error', 'Correo o contraseña incorrectos. Por favor, verifica tus datos.');
+                } else {
+                    Alert.alert('Error', error.message);
+                }
             } else {
-                Alert.alert('Error', error.message);
+                console.log('Inicio de sesión exitoso:', data.user?.id);
             }
-        } else {
-            console.log('Inicio de sesión exitoso:', data.user?.id);
+        } finally {
+            setLoadingProvider(null);
         }
-        setLoading(false);
+    };
+
+    const handleGoogleLogin = async () => {
+        if (isBusy) return;
+
+        setLoadingProvider('google');
+        try {
+            const safeDecode = (value: string) => {
+                try {
+                    return decodeURIComponent(value);
+                } catch {
+                    return value;
+                }
+            };
+
+            const redirectTo = Linking.createURL('login');
+            const { data, error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo,
+                    queryParams: { prompt: 'select_account' },
+                },
+            });
+
+            if (error) {
+                Alert.alert('Error', error.message);
+                return;
+            }
+
+            // En web, Supabase redirige el navegador; el callback se procesa vía detectSessionInUrl.
+            if (Platform.OS === 'web') return;
+
+            if (!data?.url) {
+                Alert.alert('Error', 'No se pudo iniciar el flujo de autenticación con Google.');
+                return;
+            }
+
+            const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+
+            if (result.type !== 'success' || !result.url) {
+                return;
+            }
+
+            const callbackUrl = new URL(result.url);
+            const errorDescription =
+                callbackUrl.searchParams.get('error_description') ||
+                callbackUrl.searchParams.get('error');
+            if (errorDescription) {
+                Alert.alert('Error', safeDecode(errorDescription));
+                return;
+            }
+
+            const code = callbackUrl.searchParams.get('code');
+            if (!code) {
+                Alert.alert('Error', 'No se recibió el código de autenticación.');
+                return;
+            }
+
+            const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+            if (exchangeError) {
+                Alert.alert('Error', exchangeError.message);
+            }
+        } catch (err) {
+            console.error('Error en inicio de sesión con Google:', err);
+            Alert.alert('Error', 'No se pudo completar el inicio de sesión con Google.');
+        } finally {
+            setLoadingProvider(null);
+        }
     };
 
     return (
@@ -65,6 +144,27 @@ export default function LoginScreen() {
 
                 <View style={styles.card}>
                     <Text style={styles.cardTitle}>Iniciar Sesión</Text>
+
+                    <TouchableOpacity
+                        style={[styles.socialButton, isBusy && styles.socialButtonDisabled]}
+                        onPress={handleGoogleLogin}
+                        disabled={isBusy}
+                    >
+                        {isGoogleLoading ? (
+                            <ActivityIndicator color="#1a1a2e" />
+                        ) : (
+                            <>
+                                <Ionicons name="logo-google" size={20} color="#1a1a2e" style={styles.socialIcon} />
+                                <Text style={styles.socialButtonText}>Continuar con Google</Text>
+                            </>
+                        )}
+                    </TouchableOpacity>
+
+                    <View style={styles.dividerRow}>
+                        <View style={styles.dividerLine} />
+                        <Text style={styles.dividerText}>o</Text>
+                        <View style={styles.dividerLine} />
+                    </View>
 
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Correo Electrónico</Text>
@@ -134,16 +234,16 @@ export default function LoginScreen() {
                                     }
                                 });
                             })();
-                    }}>
+                    }} disabled={isBusy}>
                         <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                        style={[styles.primaryButton, loading && styles.primaryButtonDisabled]}
+                        style={[styles.primaryButton, isBusy && styles.primaryButtonDisabled]}
                         onPress={handleLogin}
-                        disabled={loading}
+                        disabled={isBusy}
                     >
-                        {loading ? (
+                        {isPasswordLoading ? (
                             <ActivityIndicator color="#fff" />
                         ) : (
                             <Text style={styles.primaryButtonText}>Entrar</Text>
@@ -153,7 +253,7 @@ export default function LoginScreen() {
 
                 <View style={styles.footer}>
                     <Text style={styles.footerText}>¿No tienes una cuenta? </Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('Register')} disabled={loading}>
+                    <TouchableOpacity onPress={() => navigation.navigate('Register')} disabled={isBusy}>
                         <Text style={styles.footerLink}>Regístrate</Text>
                     </TouchableOpacity>
                 </View>
@@ -216,6 +316,47 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#1a1a2e',
         marginBottom: 24,
+    },
+    socialButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        borderRadius: 12,
+        paddingVertical: 16,
+        paddingHorizontal: 12,
+        marginBottom: 18,
+    },
+    socialButtonDisabled: {
+        opacity: 0.6,
+    },
+    socialIcon: {
+        marginRight: 10,
+    },
+    socialButtonText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1a1a2e',
+    },
+    dividerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#e2e8f0',
+    },
+    dividerText: {
+        marginHorizontal: 12,
+        color: '#888',
+        fontSize: 12,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
     },
     inputContainer: {
         marginBottom: 20,
